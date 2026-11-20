@@ -73,6 +73,8 @@ Bootstrap uses DATABASE_URL and runs once. Remove bootstrap credentials afterwar
 
 ## 4. Import in Vercel
 
+This repository currently defaults Vercel to the owner?s AWS-free test deployment. For a full production deployment, explicitly set TEST_DEPLOYMENT=false and configure all services below. Set APP_ORIGIN to your actual production domain.
+
 1. Sign in to Vercel and choose **Add New → Project**.
 2. Connect GitHub and import **ctittor/vestry**: https://github.com/ctittor/vestry.
 3. Root directory: repository root. Framework: **Vite**. Node.js: **24.x**. Enable Fluid compute. The checked-in configuration supplies npm ci, npm run build, output dist, API routing and a 60-second API duration. Do not use a Docker start command.

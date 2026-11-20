@@ -177,8 +177,15 @@ const authLimit = rateLimit({
 const api = express.Router();
 app.use("/api/v1", api);
 api.get("/health", async (_req, res) => {
-  await pool.query("SELECT 1");
-  res.json({ status: "ok" });
+  try {
+    const { rows: [schema] } = await pool.query("SELECT to_regclass('public.users') AS users, to_regclass('public.foranes') AS foranes, to_regclass('public.persons') AS persons");
+    if (!schema.users || !schema.foranes || !schema.persons)
+      return res.status(503).json({code:"DATABASE_SCHEMA_MISSING",error:"PostgreSQL is reachable but migrations are missing. Run db:migrate against this database."});
+    res.json({ status: "ok" });
+  } catch (cause) {
+    console.error(JSON.stringify({event:"database.health_failed",code:(cause as {code?:string}).code}));
+    res.status(503).json({code:"DATABASE_UNAVAILABLE",error:"The API is running but cannot connect to PostgreSQL. Verify DATABASE_URL and database availability in Vercel."});
+  }
 });
 api.post("/auth/login", authLimit, async (req, res) => {
   const v = z

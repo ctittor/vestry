@@ -23,3 +23,27 @@ test("Vercel entry preserves API routing and protects the mail cron", async () =
     await new Promise<void>(resolve => server.close(() => resolve()));
   }
 });
+
+test('startup configuration returns JSON with missing setting names and no secret values', async () => {
+  const fields = ['NODE_ENV','VERCEL','TEST_DEPLOYMENT','STORAGE_DRIVER','MFA_ENCRYPTION_KEY','DATABASE_URL','APP_ORIGIN','COOKIE_SECURE','CRON_SECRET'];
+  const previous = Object.fromEntries(fields.map(key=>[key,process.env[key]]));
+  const server = createServer(handler);
+  try {
+    Object.assign(process.env,{NODE_ENV:'production',VERCEL:'1',TEST_DEPLOYMENT:'true',STORAGE_DRIVER:'disabled',MFA_ENCRYPTION_KEY:'invalid-private-test-value',APP_ORIGIN:'https://vestry-j794.vercel.app',COOKIE_SECURE:'true',CRON_SECRET:'c'.repeat(32)});
+    delete process.env.DATABASE_URL;
+    await new Promise<void>(resolve=>server.listen(0,'127.0.0.1',resolve));
+    const address=server.address(); assert.ok(address && typeof address!=='string');
+    const response=await fetch(`http://127.0.0.1:${address.port}/api/v1/health`);
+    assert.equal(response.status,503);
+    assert.match(response.headers.get('content-type')||'',/application\/json/);
+    const body=await response.json();
+    assert.equal(body.code,'SERVER_CONFIGURATION_ERROR');
+    assert.match(body.error,/MFA_ENCRYPTION_KEY/);
+    assert.match(body.error,/Missing DATABASE_URL/);
+    assert.ok(!JSON.stringify(body).includes('invalid-private-test-value'));
+  } finally {
+    for(const key of fields){if(previous[key]===undefined)delete process.env[key];else process.env[key]=previous[key];}
+    server.closeAllConnections();
+    await new Promise<void>(resolve=>server.close(()=>resolve()));
+  }
+});

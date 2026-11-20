@@ -8,12 +8,15 @@ const fields = ['NODE_ENV','VERCEL','TEST_DEPLOYMENT','STORAGE_DRIVER','MFA_ENCR
 test('AWS-free testing retains HTTPS/key checks and production service requirements', () => {
   const previous = Object.fromEntries(fields.map(key => [key, process.env[key]]));
   try {
-    Object.assign(process.env, {NODE_ENV:'production', VERCEL:'1', TEST_DEPLOYMENT:'true', STORAGE_DRIVER:'disabled', MFA_ENCRYPTION_KEY:'a'.repeat(64), APP_ORIGIN:'https://vestry-test.example', DATABASE_URL:'postgres://unused', COOKIE_SECURE:'true', CRON_SECRET:'b'.repeat(32)});
+    Object.assign(process.env, {NODE_ENV:'production', VERCEL:'1', TEST_DEPLOYMENT:'true', STORAGE_DRIVER:'disabled', MFA_ENCRYPTION_KEY:'a'.repeat(64), APP_ORIGIN:'https://vestry-test.example', DATABASE_URL:'postgres://vestry_app:example@database.example/vestry', COOKIE_SECURE:'true', CRON_SECRET:'b'.repeat(32)});
     delete process.env.SMTP_HOST; delete process.env.SMTP_FROM; delete process.env.S3_BUCKET;
     assert.doesNotThrow(validateRuntime);
     process.env.COOKIE_SECURE='false'; assert.throws(validateRuntime, /secure cookies/);
     process.env.COOKIE_SECURE='true'; process.env.MFA_ENCRYPTION_KEY='bad'; assert.throws(validateRuntime, /64 hex/);
-    process.env.MFA_ENCRYPTION_KEY='a'.repeat(64); process.env.TEST_DEPLOYMENT='false'; assert.throws(validateRuntime, /SMTP_HOST/);
+    process.env.MFA_ENCRYPTION_KEY='a'.repeat(64);
+    process.env.DATABASE_URL='postgres://owner:must-not-be-used@database.example/vestry'; assert.throws(validateRuntime, /restricted vestry_app/);
+    process.env.DATABASE_URL='postgres://vestry_app:example@localhost:5432/vestry'; assert.throws(validateRuntime, /localhost is unavailable/);
+    process.env.DATABASE_URL='postgres://vestry_app:example@database.example/vestry'; process.env.TEST_DEPLOYMENT='false'; assert.throws(validateRuntime, /SMTP_HOST/);
     process.env.SMTP_HOST='smtp.example'; process.env.SMTP_FROM='test@example.com'; assert.throws(validateRuntime, /persistent S3/);
   } finally { for (const key of fields) { if(previous[key]===undefined) delete process.env[key]; else process.env[key]=previous[key]; } }
 });

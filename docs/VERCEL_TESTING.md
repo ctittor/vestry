@@ -87,3 +87,13 @@ Production privileged roles still require MFA enrollment. Set it up through the 
 For a complete production installation later, use a fresh production database and follow VERCEL_DEPLOYMENT.md with persistent object storage, scanner, SMTP and a worker, then remove TEST_DEPLOYMENT. Do not enable delivery of an old test database's queued messages to real recipients.
 
 References: https://vercel.com/docs/marketplace-storage and https://neon.com/docs/connect/connect-from-any-app.
+
+## Current test site: vestry-j794.vercel.app
+
+The repository supplies non-secret Vercel defaults for this test site: APP_ORIGIN=https://vestry-j794.vercel.app, COOKIE_SECURE=true, TEST_DEPLOYMENT=true and STORAGE_DRIVER=disabled. Explicit project variables override them. Build and API startup apply the same defaults. Secrets are never supplied in source.
+
+The startup error "MFA_ENCRYPTION_KEY must be 64 hex characters" means the Vercel variable is missing or invalid. Set its exact existing local .env value under Settings ? Environment Variables ? Production, then redeploy. Do not paste the variable name, surrounding quotes or whitespace into the value field. A private .env.vercel.local file can be imported through Vercel?s environment-variable import interface; this file is ignored by Git and contains the existing key and a cron secret. Keep your hosted restricted DATABASE_URL separately configured: the local localhost URL does not work on Vercel.
+
+The API now returns JSON configuration errors with setting names, never secret values. /api/v1/health also distinguishes a missing schema from an unavailable database. A remaining API_STARTUP_FAILED code requires checking Function Logs for api.startup_failed.
+
+Before a real production rollout, explicitly set TEST_DEPLOYMENT=false, configure production services, and set the real APP_ORIGIN. For any different test domain, set APP_ORIGIN to its exact HTTPS origin.

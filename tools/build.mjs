@@ -1,6 +1,8 @@
+import { applyDeploymentDefaults } from "../shared/deployment.ts";
 import { spawnSync } from "node:child_process";
 import { readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { gzipSync, brotliCompressSync, constants } from "node:zlib";
+applyDeploymentDefaults();
 for (const args of [
   ["node_modules/typescript/bin/tsc", "--noEmit"],
   ["node_modules/vite/bin/vite.js", "build"],

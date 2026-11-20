@@ -32,3 +32,9 @@ Production build, 13 API/security tests (including serverless entry and protecte
 Normal and Vercel test builds passed, along with all 15 API/security tests. Ten targeted isolation/security tests also passed with TEST_DEPLOYMENT=true. Test mode keeps HTTPS, cookie, MFA-key and access-control requirements, rejects file persistence and OCR, and leaves outgoing messages queued without claiming delivery. A loading-message contrast issue surfaced during the browser accessibility check and its foreground was darkened.
 
 All four targeted test-mode browser scenarios passed after the contrast correction: forane provisioning, parish reporting/review, mobile visitation and test-banner login at mobile/desktop widths. Live Neon/Vercel provisioning remains a user-account step.
+
+## Live Vercel startup diagnosis
+
+The public website returned HTTP 200 while /api/v1/health returned FUNCTION_INVOCATION_FAILED. The supplied function log confirmed an invalid/missing MFA_ENCRYPTION_KEY. The API now validates settings per invocation before loading the application, returns structured JSON setup errors without secret values, and distinguishes database/schema failures. The client reports non-JSON serverless failures and incorrect HTML routing explicitly. Non-secret build/runtime defaults target vestry-j794.vercel.app in AWS-free test mode. Secrets remain in project environment settings. Normal build and all 19 API/security tests passed locally.
+
+The Vercel-specific build, seven targeted deployment/client/configuration checks and three login/navigation/parish-isolation browser scenarios also passed. The private import file was verified ignored by Git; staged source contains none of its secret values.
