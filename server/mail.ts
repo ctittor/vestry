@@ -1,3 +1,4 @@
+import { testDeployment } from "./runtime.js";
 import nodemailer from "nodemailer";
 import { pool, type DB } from "./db.js";
 import { encrypt, decrypt } from "./security.js";
@@ -14,6 +15,7 @@ export async function deliverToken(
   );
 }
 export async function deliverMail(batchSize = 5) {
+  if (testDeployment()) return; // Retain queued messages without claiming delivery.
   const db = await pool.connect();
   try {
     await db.query("BEGIN");

@@ -7,7 +7,7 @@ for (const args of [
 ]) {
   const r = spawnSync(process.execPath, args, {
     stdio: "inherit",
-    env: { ...process.env, NODE_ENV: "production", VITE_SERVERLESS: process.env.VERCEL ? "true" : "false" },
+    env: { ...process.env, NODE_ENV: "production", VITE_SERVERLESS: process.env.VERCEL ? "true" : "false", VITE_TEST_DEPLOYMENT: process.env.TEST_DEPLOYMENT === "true" ? "true" : "false" },
   });
   if (r.status !== 0) process.exit(r.status || 1);
 }

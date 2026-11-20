@@ -1,3 +1,4 @@
+import { testDeployment } from "./runtime.js";
 import "dotenv/config";
 import express, {
   type Request,
@@ -1460,6 +1461,7 @@ export async function enqueue(jobId: string, tenantId: string) {
   }
 }
 api.post("/jobs", permit("ocr.process"), async (req, res) => {
+  if (testDeployment()) fail(503, "OCR processing is unavailable in the test deployment.");
   const result = await scoped(tenant(req), async (db) => {
     const v = z
       .object({
@@ -1580,6 +1582,7 @@ api.post("/jobs/:id/import", permit("ocr.approve_import"), async (req, res) =>
   ),
 );
 api.post("/jobs/:id/retry", permit("ocr.process"), async (req, res) => {
+  if (testDeployment()) fail(503, "OCR processing is unavailable in the test deployment.");
   const j = await scoped(tenant(req), async (db) => {
     const j = await one(db, "ocr_jobs", req.params.id, true);
     if (j.status !== "failed" || j.provider === "manual")

@@ -1,3 +1,4 @@
+import { requireFileServices } from "./runtime.js";
 import { mkdir, writeFile, readFile } from "node:fs/promises";
 import path from "node:path";
 import {
@@ -26,6 +27,7 @@ function localPath(key: string) {
   return target;
 }
 export async function putOriginal(key: string, buffer: Buffer, mime: string) {
+  requireFileServices();
   if (process.env.STORAGE_DRIVER === "s3") {
     await s3.send(
       new PutObjectCommand({
@@ -43,6 +45,7 @@ export async function putOriginal(key: string, buffer: Buffer, mime: string) {
   }
 }
 export async function getOriginal(key: string): Promise<Buffer> {
+  requireFileServices();
   if (process.env.STORAGE_DRIVER === "s3") {
     const r = await s3.send(
       new GetObjectCommand({ Bucket: process.env.S3_BUCKET, Key: key }),
@@ -52,6 +55,7 @@ export async function getOriginal(key: string): Promise<Buffer> {
   return readFile(localPath(key));
 }
 export async function scan(buffer: Buffer) {
+  requireFileServices();
   if (!process.env.CLAMAV_HOST) {
     if (
       process.env.REQUIRE_MALWARE_SCAN === "true" ||

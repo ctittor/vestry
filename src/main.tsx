@@ -7671,6 +7671,12 @@ function PersonHistory({ person }: { person: Row }) {
 }
 createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
+    {import.meta.env.VITE_TEST_DEPLOYMENT === "true" && (
+      <div className="test-deployment-banner" role="status">
+        <strong>Test deployment ? Synthetic data only</strong>
+        <span>Uploads, original files, OCR and outgoing email are unavailable. In-app change alerts remain active.</span>
+      </div>
+    )}
     <App />
   </React.StrictMode>,
 );

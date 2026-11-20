@@ -1,5 +1,7 @@
 # Vestry
 
+**Testing without AWS:** follow the [Vercel + Neon test setup](docs/VERCEL_TESTING.md). It supports core records and role testing; uploads, OCR and outgoing email are unavailable.
+
 For Vercel, follow the [step-by-step deployment and database migration guide](docs/VERCEL_DEPLOYMENT.md). The private verified PostgreSQL dump stays under `data/migration/` and is excluded from Git.
 
 A Roman Catholic archdiocese and parish records workspace. Hierarchy: archdiocese → forane → parish → unit → household → member. React/TypeScript, Express, PostgreSQL with forced row-level security, Redis/BullMQ, local or S3-compatible original storage, and an optional local OCR worker.

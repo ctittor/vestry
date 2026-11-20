@@ -26,3 +26,9 @@ Forane extension evidence: migrations 014-015 applied locally; both forane demon
 ## Vercel preparation ? 20 November 2026
 
 Production build, 13 API/security tests (including serverless entry and protected cron), 10 browser scenarios, and portable migration completed locally. A PostgreSQL custom-format archive was fully restored into an isolated database and all 36 public tables counted; checksum and counts are in its private manifest. Staged source was checked against local secret values; no matches. Live Vercel infrastructure, SMTP/scanner connectivity and target database restore require account configuration described in VERCEL_DEPLOYMENT.md and have not been verified remotely.
+
+## AWS-free testing mode
+
+Normal and Vercel test builds passed, along with all 15 API/security tests. Ten targeted isolation/security tests also passed with TEST_DEPLOYMENT=true. Test mode keeps HTTPS, cookie, MFA-key and access-control requirements, rejects file persistence and OCR, and leaves outgoing messages queued without claiming delivery. A loading-message contrast issue surfaced during the browser accessibility check and its foreground was darkened.
+
+All four targeted test-mode browser scenarios passed after the contrast correction: forane provisioning, parish reporting/review, mobile visitation and test-banner login at mobile/desktop widths. Live Neon/Vercel provisioning remains a user-account step.

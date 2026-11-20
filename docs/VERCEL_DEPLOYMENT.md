@@ -1,5 +1,7 @@
 ﻿# Vercel deployment and database migration
 
+For a limited test deployment without AWS, object storage, email or workers, see [Vercel + Neon testing](VERCEL_TESTING.md).
+
 Vercel hosts the React website and Express API. PostgreSQL, S3, Redis, malware scanning and the continuous OCR/email worker remain external. Keep your existing AWS services, or provision equivalents. Docker deployment remains supported.
 
 ## 1. Prepare services
