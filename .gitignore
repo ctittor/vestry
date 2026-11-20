@@ -14,3 +14,4 @@ playwright-report/
 *.pem
 *.key
 church-records.code-workspace
+/DUMMY_LOGIN_CREDENTIALS.md

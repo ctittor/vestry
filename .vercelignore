@@ -8,3 +8,4 @@ test-results
 playwright-report
 docs
 infrastructure
+DUMMY_LOGIN_CREDENTIALS.md
