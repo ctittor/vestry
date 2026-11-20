@@ -29,10 +29,21 @@ if (r.status !== 0) throw new Error("Restore failed. Check target permissions, S
 const verify = new pg.Client({ connectionString: process.env.RESTORE_DATABASE_URL });
 await verify.connect();
 try {
+  // Managed owners may lack BYPASSRLS. They own restored tables, so lift FORCE
+  // only inside a locked transaction and always roll it back after counting.
+  await verify.query("BEGIN");
+  const forced = await verify.query("SELECT tablename FROM pg_tables JOIN pg_class ON pg_class.oid=(quote_ident(schemaname)||'.'||quote_ident(tablename))::regclass WHERE schemaname='public' AND relforcerowsecurity");
+  for (const { tablename } of forced.rows) {
+    const quoted = '"' + tablename.replaceAll('"', '""') + '"';
+    await verify.query('ALTER TABLE public.' + quoted + ' NO FORCE ROW LEVEL SECURITY');
+  }
   for (const [name, expected] of Object.entries(manifest.restoredRowCounts)) {
     const quoted = '"' + name.replaceAll('"', '""') + '"';
     const { rows: [row] } = await verify.query(`SELECT count(*) FROM public.${quoted}`);
     if (Number(row.count) !== expected) throw new Error(`Row count mismatch: ${name}`);
   }
-} finally { await verify.end(); }
+} finally {
+  await verify.query("ROLLBACK");
+  await verify.end();
+}
 console.log("Restore and table counts verified. Run db:migrate with the target owner URL to grant the restricted runtime role.");
