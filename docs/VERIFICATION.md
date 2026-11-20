@@ -42,3 +42,7 @@ The Vercel-specific build, seven targeted deployment/client/configuration checks
 ## Vercel production install correction
 
 The build log reported missing node_modules/typescript/bin/tsc. Vercel installation now explicitly uses npm ci --include=dev so NODE_ENV=production cannot omit TypeScript, Vite and build-time type definitions. A completely separate workspace, without pre-existing node_modules or .env files, successfully completed npm ci --include=dev and npm run build with NODE_ENV=production and VERCEL=1. No application or database behavior changed.
+
+## Vercel mapped origins ? 21 November 2026
+
+Live health at vestry-xi.vercel.app returned 200; an empty login request with that Origin returned 403 before the change. Updated canonical origin and exact mapped alias handling, with current deployment/branch origins sourced from Vercel system variables. Normal build and all 23 API/security tests passed; tests verify shown domains reach credential validation and unrelated/lookalike origins remain forbidden. Private credentials/import files remain ignored.

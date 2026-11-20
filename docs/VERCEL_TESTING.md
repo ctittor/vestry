@@ -90,7 +90,7 @@ References: https://vercel.com/docs/marketplace-storage and https://neon.com/doc
 
 ## Current test site: vestry-j794.vercel.app
 
-The repository supplies non-secret Vercel defaults for this test site: APP_ORIGIN=https://vestry-j794.vercel.app, COOKIE_SECURE=true, TEST_DEPLOYMENT=true and STORAGE_DRIVER=disabled. Explicit project variables override them. Build and API startup apply the same defaults. Secrets are never supplied in source.
+The repository supplies non-secret Vercel defaults for this test site: APP_ORIGIN=https://vestry-xi.vercel.app, COOKIE_SECURE=true, TEST_DEPLOYMENT=true and STORAGE_DRIVER=disabled. Explicit project variables override them. Build and API startup apply the same defaults. Secrets are never supplied in source.
 
 The startup error "MFA_ENCRYPTION_KEY must be 64 hex characters" means the Vercel variable is missing or invalid. Set its exact existing local .env value under Settings ? Environment Variables ? Production, then redeploy. Do not paste the variable name, surrounding quotes or whitespace into the value field. A private .env.vercel.local file can be imported through Vercel?s environment-variable import interface; this file is ignored by Git and contains the existing key and a cron secret. Keep your hosted restricted DATABASE_URL separately configured: the local localhost URL does not work on Vercel.
 
@@ -105,3 +105,7 @@ The Vercel install command must be `npm ci --include=dev`. TypeScript, Vite and 
 ## Repeated old TypeScript error
 
 If logs still show the raw missing node_modules/typescript/bin/tsc error without the newer dependency diagnostic or [Vestry build v2] marker, check the deployment Source commit and connected repository. Creating a deployment from the main branch uses the latest branch source; retrying an older deployment rebuilds that deployment?s source. In Deployments ? Create Deployment, enter https://github.com/ctittor/vestry/tree/main, then verify the Source commit. The new build prints [Vestry build v2] source=<commit>. Use npm ci --include=dev and disable existing build cache when retrying the correct source.
+
+## Mapped domains and request origins
+
+The current canonical test URL is https://vestry-xi.vercel.app. Exact origins for the shown project aliases are trusted; Vercel-provided VERCEL_URL, VERCEL_BRANCH_URL and VERCEL_PROJECT_PRODUCTION_URL also identify this deployment?s exact URLs. No wildcard vercel.app origin or request Host header is trusted. A retained APP_ORIGIN=https://vestry-j794.vercel.app setting is migrated to the current project production URL. Explicit other custom origins remain unchanged. For additional custom domains, set APP_ALLOWED_ORIGINS to a comma-separated list of full HTTPS origins and redeploy. Sessions remain specific to the hostname used to sign in.

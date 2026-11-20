@@ -47,3 +47,23 @@ test('startup configuration returns JSON with missing setting names and no secre
     await new Promise<void>(resolve=>server.close(()=>resolve()));
   }
 });
+
+test('login accepts mapped project origins and rejects unrelated origins before credentials are processed', async()=>{
+  const fields=['VERCEL','NODE_ENV','APP_ORIGIN'];
+  const previous=Object.fromEntries(fields.map(key=>[key,process.env[key]]));
+  const {default:app}=await import('../server/app.js');
+  const server=createServer(app);
+  try {
+    Object.assign(process.env,{VERCEL:'1',NODE_ENV:'production',APP_ORIGIN:'https://vestry-xi.vercel.app'});
+    await new Promise<void>(resolve=>server.listen(0,'127.0.0.1',resolve));
+    const address=server.address();assert.ok(address && typeof address!=='string');
+    const base=`http://127.0.0.1:${address.port}/api/v1/auth/login`;
+    for(const origin of ['https://vestry-xi.vercel.app','https://vestry-git-main-titto-roberts-projects.vercel.app','https://vestry-neh1t94fm-titto-roberts-projects.vercel.app']){
+      const response=await fetch(base,{method:'POST',headers:{Origin:origin,'Content-Type':'application/json'},body:'{}'});
+      assert.equal(response.status,400,origin);
+      assert.ok(!(await response.json()).error.includes('origin is not permitted'));
+    }
+    const denied=await fetch(base,{method:'POST',headers:{Origin:'https://unrelated.vercel.app','Content-Type':'application/json'},body:'{}'});
+    assert.equal(denied.status,403);
+  }finally{for(const key of fields){if(previous[key]===undefined)delete process.env[key];else process.env[key]=previous[key];}server.closeAllConnections();await new Promise<void>(resolve=>server.close(()=>resolve()));}
+});

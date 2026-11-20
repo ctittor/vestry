@@ -1,3 +1,4 @@
+import { deploymentOrigins } from "../shared/deployment.js";
 import { testDeployment } from "./runtime.js";
 import "dotenv/config";
 import express, {
@@ -126,7 +127,7 @@ const fieldSchema = z.object({
 });
 const origin = () => process.env.APP_ORIGIN || "http://localhost:5173";
 const permittedOrigin = (req: Request) =>
-  isAllowedOrigin(req.get("Origin"), origin(), process.env.NODE_ENV);
+  isAllowedOrigin(req.get("Origin"), origin(), process.env.NODE_ENV, deploymentOrigins());
 const app = express();
 if (process.env.VERCEL) app.set("trust proxy", 1);
 const dummyPasswordHash = hash(token());
