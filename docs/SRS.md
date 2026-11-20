@@ -1,0 +1,4 @@
+# Implemented software requirements
+The master specification remains REQUIREMENTS.md. Runtime: Node 24; PostgreSQL 18; React browser app. REST prefix /api/v1. Tenant data must be scoped from the authenticated session, validated with request schemas, and processed in a transaction setting app.tenant_id. Approved entries cannot be directly rewritten. Original files are immutable application objects. All uploaded/extracted content is untrusted.
+
+Source references identify original asset, volume, page and row. Dates can be exact, year, approximate or unknown. Null remains unknown. Extraction review and official approval are distinct. Changes to register field definitions create a new schema version. Mandatory test categories and remaining acceptance gaps appear in TEST_STRATEGY.md and RELEASE_STATUS.md.

@@ -1,0 +1,31 @@
+name: Verify Vestry
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_USER: vestry_owner
+          POSTGRES_PASSWORD: ci-only-owner-password
+          POSTGRES_DB: vestry
+        ports: ["5432:5432"]
+        options: --health-cmd "pg_isready -U vestry_owner -d vestry" --health-interval 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: node tools/setup-env.mjs --ci
+      - run: npm run db:migrate
+      - run: npm run db:seed
+      - run: npm run build
+      - run: npm test
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e
+      - run: npm audit --omit=dev --audit-level=high

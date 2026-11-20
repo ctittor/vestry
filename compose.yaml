@@ -1,0 +1,100 @@
+name: vestry
+services:
+  db:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_DB: vestry
+      POSTGRES_USER: vestry_owner
+      POSTGRES_PASSWORD: ${DB_OWNER_PASSWORD:?Set DB_OWNER_PASSWORD in .env}
+    ports: ["127.0.0.1:55432:5432"]
+    volumes: ["postgres_data:/var/lib/postgresql"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U vestry_owner -d vestry"]
+      interval: 5s
+      retries: 15
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    ports: ["127.0.0.1:56379:6379"]
+    volumes: ["redis_data:/data"]
+  app:
+    init: true
+    stop_grace_period: 45s
+    profiles: ["app"]
+    build: .
+    image: vestry-app:local
+    environment:
+      NODE_ENV: production
+      APP_ORIGIN: ${APP_ORIGIN}
+      DATABASE_URL: postgres://vestry_app:${DB_APP_PASSWORD}@db:5432/vestry
+      REDIS_URL: redis://redis:6379
+      COOKIE_SECURE: "true"
+      MFA_ENCRYPTION_KEY: ${MFA_ENCRYPTION_KEY}
+      STORAGE_DRIVER: ${STORAGE_DRIVER:-local}
+      S3_ENDPOINT: ${S3_ENDPOINT:-}
+      S3_REGION: ${S3_REGION:-us-east-1}
+      S3_BUCKET: ${S3_BUCKET:-vestry-originals}
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY:-}
+      S3_SECRET_KEY: ${S3_SECRET_KEY:-}
+      CLAMAV_HOST: ${CLAMAV_HOST:-}
+      CLAMAV_PORT: ${CLAMAV_PORT:-3310}
+      REQUIRE_MALWARE_SCAN: "true"
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_SECURE: ${SMTP_SECURE:-false}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_FROM: ${SMTP_FROM:-}
+      PORT: 4000
+    ports: ["127.0.0.1:4000:4000"]
+    depends_on:
+      db: { condition: service_healthy }
+    volumes: ["uploads:/app/data"]
+    restart: unless-stopped
+    read_only: true
+    tmpfs: ["/tmp:rw,noexec,nosuid,size=256m"]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    pids_limit: 100
+    mem_limit: 512m
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:4000/api/v1/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+  worker:
+    init: true
+    stop_grace_period: 210s
+    profiles: ["app"]
+    build: .
+    image: vestry-app:local
+    command: ["node", "--import", "tsx", "server/worker.ts"]
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgres://vestry_app:${DB_APP_PASSWORD}@db:5432/vestry
+      REDIS_URL: redis://redis:6379
+      STORAGE_DRIVER: ${STORAGE_DRIVER:-local}
+      S3_ENDPOINT: ${S3_ENDPOINT:-}
+      S3_REGION: ${S3_REGION:-us-east-1}
+      S3_BUCKET: ${S3_BUCKET:-vestry-originals}
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY:-}
+      S3_SECRET_KEY: ${S3_SECRET_KEY:-}
+    volumes: ["uploads:/app/data"]
+    depends_on: [redis, db]
+    restart: unless-stopped
+    read_only: true
+    tmpfs: ["/tmp:rw,noexec,nosuid,size=256m"]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    pids_limit: 100
+    mem_limit: 1g
+volumes:
+  postgres_data:
+  redis_data:
+  uploads:

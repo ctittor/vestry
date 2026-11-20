@@ -1,0 +1,10 @@
+.git
+.env*
+!.env.example
+data
+.qa
+tests
+test-results
+playwright-report
+docs
+infrastructure

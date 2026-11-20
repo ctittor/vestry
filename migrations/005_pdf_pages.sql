@@ -1,0 +1,12 @@
+CREATE TABLE archive_pages (id uuid PRIMARY KEY DEFAULT gen_random_uuid(),tenant_id uuid NOT NULL REFERENCES tenants,asset_id uuid NOT NULL,page_number integer NOT NULL CHECK(page_number>0 AND page_number<=200),storage_key text NOT NULL UNIQUE,mime text NOT NULL DEFAULT 'image/png',created_at timestamptz NOT NULL DEFAULT now(),UNIQUE(tenant_id,id),UNIQUE(tenant_id,asset_id,page_number),FOREIGN KEY(tenant_id,asset_id) REFERENCES assets(tenant_id,id));
+ALTER TABLE archive_pages ENABLE ROW LEVEL SECURITY;
+ALTER TABLE archive_pages FORCE ROW LEVEL SECURITY;
+CREATE POLICY tenant_isolation ON archive_pages USING(tenant_id=tenant_context()) WITH CHECK(tenant_id=tenant_context());
+ALTER TABLE ocr_jobs ADD COLUMN page_id uuid;
+ALTER TABLE ocr_jobs ADD COLUMN parent_job_id uuid;
+ALTER TABLE ocr_jobs ADD CONSTRAINT jobs_page_tenant FOREIGN KEY(tenant_id,page_id) REFERENCES archive_pages(tenant_id,id);
+ALTER TABLE ocr_jobs ADD CONSTRAINT jobs_parent_tenant FOREIGN KEY(tenant_id,parent_job_id) REFERENCES ocr_jobs(tenant_id,id);
+ALTER TABLE ocr_jobs ADD CONSTRAINT jobs_pdf_page_unique UNIQUE(tenant_id,parent_job_id,page_id);
+ALTER TABLE ocr_jobs DROP CONSTRAINT ocr_jobs_status_check;
+ALTER TABLE ocr_jobs ADD CONSTRAINT ocr_jobs_status_check CHECK(status IN ('manual','queued','processing','review','reviewed','imported','failed','split'));
+CREATE TRIGGER archive_pages_immutable BEFORE UPDATE OR DELETE ON archive_pages FOR EACH ROW EXECUTE FUNCTION protect_append_only();

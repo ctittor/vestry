@@ -1,0 +1,16 @@
+node_modules/
+dist/
+.env
+.env.*
+!.env.example
+data/
+test-results/
+playwright-report/
+.qa/
+*.log
+.vercel/
+*.dump
+*.backup
+*.pem
+*.key
+church-records.code-workspace

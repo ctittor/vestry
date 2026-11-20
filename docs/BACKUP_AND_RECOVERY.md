@@ -1,0 +1,8 @@
+# Backup and recovery
+Targets from requirements: RPO ≤24h and RTO ≤8h, subject to validated hosting design. These are not achieved SLAs. Create daily encrypted PostgreSQL custom-format dumps and original-object backups, with a separate off-site account/copy. Include register schemas, sessions/account state as appropriate, immutable audit/version history, storage metadata, original files, and the encrypted MFA key backup. Keep rotation/retention subject to approved policy.
+
+Local drill: `node tools/backup-drill.mjs`. It uses Docker to dump the dedicated vestry database, restores into a new temporary database inside the same isolated container, and checks table counts. The production source database is never overwritten. Drill files go into ignored data/backups. Runtime and restored databases must have the same RLS policies, append-only triggers and role grants. Inspect full workflow integrity after a restore, not only row counts.
+
+Incident procedure: stop writes/workers; identify backup/checksum/time; restore into a new private database; restore matching object snapshot; verify hashes and foreign-key consistency; rotate compromised credentials/revoke sessions; run isolation and approval smoke tests; switch connection through a controlled deploy; record actual RPO/RTO and notify authorised incident owners. Keep previous state until acceptance.
+
+A database-only drill does not prove disaster recovery for lost object storage, mail configuration or secrets. Run a complete off-site infrastructure restoration before launch and regularly thereafter. Originals on local disk need independent encrypted copies. Orphan files can exist if an upload transaction fails after storage; reconcile with assets before considering deletion and preserve audit evidence.
