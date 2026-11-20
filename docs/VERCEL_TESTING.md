@@ -101,3 +101,7 @@ Before a real production rollout, explicitly set TEST_DEPLOYMENT=false, configur
 ## Build dependencies under NODE_ENV=production
 
 The Vercel install command must be `npm ci --include=dev`. TypeScript, Vite and type definitions are required during the build even though the deployed runtime is production. The repository config sets this explicitly. If the dashboard overrides Install Command, update the override too. Redeploy the latest commit with the existing build cache disabled after an earlier install omitted development dependencies. Keep NODE_ENV=production.
+
+## Repeated old TypeScript error
+
+If logs still show the raw missing node_modules/typescript/bin/tsc error without the newer dependency diagnostic or [Vestry build v2] marker, check the deployment Source commit and connected repository. Creating a deployment from the main branch uses the latest branch source; retrying an older deployment rebuilds that deployment?s source. In Deployments ? Create Deployment, enter https://github.com/ctittor/vestry/tree/main, then verify the Source commit. The new build prints [Vestry build v2] source=<commit>. Use npm ci --include=dev and disable existing build cache when retrying the correct source.

@@ -2,6 +2,7 @@ import { applyDeploymentDefaults } from "../shared/deployment.ts";
 import { spawnSync } from "node:child_process";
 import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { gzipSync, brotliCompressSync, constants } from "node:zlib";
+console.log(`[Vestry build v2] source=${(process.env.VERCEL_GIT_COMMIT_SHA || "local").slice(0, 12)}`);
 applyDeploymentDefaults();
 for (const file of ["node_modules/typescript/bin/tsc", "node_modules/vite/bin/vite.js"]) {
   if (!existsSync(file)) {
