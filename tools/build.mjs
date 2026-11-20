@@ -1,8 +1,14 @@
 import { applyDeploymentDefaults } from "../shared/deployment.ts";
 import { spawnSync } from "node:child_process";
-import { readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { gzipSync, brotliCompressSync, constants } from "node:zlib";
 applyDeploymentDefaults();
+for (const file of ["node_modules/typescript/bin/tsc", "node_modules/vite/bin/vite.js"]) {
+  if (!existsSync(file)) {
+    console.error("Build dependencies are missing. Install with: npm ci --include=dev (including when NODE_ENV=production).");
+    process.exit(1);
+  }
+}
 for (const args of [
   ["node_modules/typescript/bin/tsc", "--noEmit"],
   ["node_modules/vite/bin/vite.js", "build"],

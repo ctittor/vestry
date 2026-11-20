@@ -97,3 +97,7 @@ The startup error "MFA_ENCRYPTION_KEY must be 64 hex characters" means the Verce
 The API now returns JSON configuration errors with setting names, never secret values. /api/v1/health also distinguishes a missing schema from an unavailable database. A remaining API_STARTUP_FAILED code requires checking Function Logs for api.startup_failed.
 
 Before a real production rollout, explicitly set TEST_DEPLOYMENT=false, configure production services, and set the real APP_ORIGIN. For any different test domain, set APP_ORIGIN to its exact HTTPS origin.
+
+## Build dependencies under NODE_ENV=production
+
+The Vercel install command must be `npm ci --include=dev`. TypeScript, Vite and type definitions are required during the build even though the deployed runtime is production. The repository config sets this explicitly. If the dashboard overrides Install Command, update the override too. Redeploy the latest commit with the existing build cache disabled after an earlier install omitted development dependencies. Keep NODE_ENV=production.

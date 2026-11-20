@@ -38,3 +38,7 @@ All four targeted test-mode browser scenarios passed after the contrast correcti
 The public website returned HTTP 200 while /api/v1/health returned FUNCTION_INVOCATION_FAILED. The supplied function log confirmed an invalid/missing MFA_ENCRYPTION_KEY. The API now validates settings per invocation before loading the application, returns structured JSON setup errors without secret values, and distinguishes database/schema failures. The client reports non-JSON serverless failures and incorrect HTML routing explicitly. Non-secret build/runtime defaults target vestry-j794.vercel.app in AWS-free test mode. Secrets remain in project environment settings. Normal build and all 19 API/security tests passed locally.
 
 The Vercel-specific build, seven targeted deployment/client/configuration checks and three login/navigation/parish-isolation browser scenarios also passed. The private import file was verified ignored by Git; staged source contains none of its secret values.
+
+## Vercel production install correction
+
+The build log reported missing node_modules/typescript/bin/tsc. Vercel installation now explicitly uses npm ci --include=dev so NODE_ENV=production cannot omit TypeScript, Vite and build-time type definitions. A completely separate workspace, without pre-existing node_modules or .env files, successfully completed npm ci --include=dev and npm run build with NODE_ENV=production and VERCEL=1. No application or database behavior changed.

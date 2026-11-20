@@ -137,3 +137,7 @@ Vercel limits request/response payloads to 4.5 MB (streamed responses have diffe
 Official references: [Express](https://vercel.com/docs/frameworks/backend/express), [function limits](https://vercel.com/docs/functions/limitations), [pool lifecycle and background tasks](https://vercel.com/docs/functions/functions-api-reference/vercel-functions-package), [cron security](https://vercel.com/docs/cron-jobs/manage-cron-jobs).
 
 These files do not create a live Vercel project or cloud services; complete the account setup above to publish.
+
+## Build dependencies under NODE_ENV=production
+
+The Vercel install command must be `npm ci --include=dev`. TypeScript, Vite and type definitions are required during the build even though the deployed runtime is production. The repository config sets this explicitly. If the dashboard overrides Install Command, update the override too. Redeploy the latest commit with the existing build cache disabled after an earlier install omitted development dependencies. Keep NODE_ENV=production.
