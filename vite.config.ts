@@ -36,7 +36,14 @@ export default defineConfig({
   server: {
     port: 5173,
     strictPort: true,
-    proxy: { "/api": `http://127.0.0.1:${process.env.PORT || "4000"}` },
+    proxy: {
+      "/api": {
+        target: `http://127.0.0.1:${process.env.PORT || "4000"}`,
+        // Origin validation compares against the browser-facing Host, including its port.
+        // Vite string shorthand defaults changeOrigin to true and breaks that check.
+        changeOrigin: false,
+      },
+    },
     watch: {
       ignored: [
         "**/.qa/**",

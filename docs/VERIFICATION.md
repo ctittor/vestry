@@ -57,3 +57,12 @@ Final Vercel build and all 24 API/security tests passed. The normal browser suit
 Local PostgreSQL and Redis were restarted without replacing volumes. API health returned 200, the Vite website returned 200, and localhost:4000 redirected to localhost:5173. Local startup now prepares standard local services, checks database readiness, and reuses healthy processes. Mail polling backs off and logs recovery; idle database disconnects no longer cause an unhandled pool error. Expired sessions are omitted and transient refresh errors preserve authentication. Browser checks used local data; live deployment verification is recorded separately when available.
 
 Live verification after pushing d6c150c: https://vestry-xi.vercel.app/api/v1/health returned 200 with environment=production and test_deployment=true. A browser signed in as the seeded parish administrator, opened all 11 available sidebar modules, verified their breadcrumb/content readiness with no API or browser errors, and signed out successfully. No parish records were changed.
+
+
+## Local Vite proxy correction - 24 November 2026
+
+The earlier browser verification covered the built preview and Vercel, but missed development login through the actual Vite proxy. Reproduced HTTP 403 on both localhost:5173 and 127.0.0.1:5173. Vite string-form proxy configuration implicitly uses changeOrigin=true, replacing the browser-facing Host with the API target on port 4000. Configured the API proxy explicitly with changeOrigin=false. Origin and CSRF checks remain unchanged.
+
+A new regression starts the real Vite configuration with an isolated HTTP backend, verifies the forwarded Host and Origin for both local hostnames, and rejects unrelated origins including a spoofed forwarded-host header. Actual browser checks on each running port-5173 address passed demo administrator login, all 11 parish sidebar modules, page refresh, and logout, with no API/browser errors and no parish record changes.
+
+The complete API/security suite passed all 25 tests including the new proxy regression. The production build passed TypeScript checking and Vite compilation.
