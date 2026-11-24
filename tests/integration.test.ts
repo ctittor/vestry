@@ -10,7 +10,7 @@ const server = app.listen(0, "127.0.0.1");
 await new Promise<void>((resolve) => server.once("listening", resolve));
 const address = server.address() as any;
 const base = `http://127.0.0.1:${address.port}/api/v1`;
-const origin = process.env.APP_ORIGIN || "http://localhost:5173";
+const origin = new URL(base).origin;
 type Client = { cookie: string; csrf: string; user: any };
 async function request(
   path: string,

@@ -1,3 +1,4 @@
+import { publicApplicationOrigin } from "./origin.js";
 import { testDeployment } from "./runtime.js";
 import nodemailer from "nodemailer";
 import { pool, type DB } from "./db.js";
@@ -27,10 +28,7 @@ export async function deliverMail(batchSize = 5) {
       try {
         const alert = mail.kind === "change_alert";
         const payload = decrypt(mail.encrypted_token);
-        const link =
-          (process.env.APP_ORIGIN || "http://localhost:5173") +
-          "/?token=" +
-          payload;
+        const link = publicApplicationOrigin() + "/?token=" + payload;
         if (process.env.SMTP_HOST) {
           const transport = nodemailer.createTransport({
             host: process.env.SMTP_HOST,

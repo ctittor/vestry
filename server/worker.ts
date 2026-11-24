@@ -1,3 +1,4 @@
+import { startMailPump } from "./mail-pump.js";
 import "dotenv/config";
 import { Worker, Queue } from "bullmq";
 import { createWorker } from "tesseract.js";
@@ -9,10 +10,7 @@ import { queueConnection, enqueue } from "./app.js";
 import { getOriginal, putOriginal } from "./storage.js";
 import { rasterisePdf } from "./pdf.js";
 import { deliverMail } from "./mail.js";
-const mailTimer = setInterval(() => {
-  void deliverMail().catch(() => console.error('{"event":"mail.poll_failed"}'));
-}, 15000);
-mailTimer.unref();
+const stopMailPump = startMailPump(() => deliverMail());
 const worker = new Worker(
   "digitisation",
   async (job) => {
@@ -237,7 +235,7 @@ console.log(
   "Local OCR worker ready. PDF working pages are separate from preserved originals.",
 );
 process.on("SIGTERM", async () => {
-  clearInterval(mailTimer);
+  stopMailPump();
   clearInterval(timer);
   await worker.close();
   await pool.end();

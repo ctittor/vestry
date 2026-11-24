@@ -46,3 +46,12 @@ The build log reported missing node_modules/typescript/bin/tsc. Vercel installat
 ## Vercel mapped origins ? 21 November 2026
 
 Live health at vestry-xi.vercel.app returned 200; an empty login request with that Origin returned 403 before the change. Updated canonical origin and exact mapped alias handling, with current deployment/branch origins sourced from Vercel system variables. Normal build and all 23 API/security tests passed; tests verify shown domains reach credential validation and unrelated/lookalike origins remain forbidden. Private credentials/import files remain ignored.
+
+
+## Dashboard stability and portable origins - 24 November 2026
+
+Fixed the production MFA redirect that silently rendered My account for every navigation click. Synthetic test deployments permit optional enrollment; full production still requires privileged MFA and clearly explains the restriction. Replaced fixed domain lists with destination-based origin checks while preserving CSRF checks and rejecting forwarded-host spoofing. Background reset links use trusted deployment metadata or an explicitly configured self-hosted email base.
+
+Final Vercel build and all 24 API/security tests passed. The normal browser suite passed 12 scenarios with one test-profile banner scenario skipped. Six additional browser scenarios passed under an isolated production-policy test harness; the navigation regression asserts production/test mode and visits every parish sidebar module. These cover forane workflows, desktop/mobile navigation, and explicit MFA gating.
+
+Local PostgreSQL and Redis were restarted without replacing volumes. API health returned 200, the Vite website returned 200, and localhost:4000 redirected to localhost:5173. Local startup now prepares standard local services, checks database readiness, and reuses healthy processes. Mail polling backs off and logs recovery; idle database disconnects no longer cause an unhandled pool error. Expired sessions are omitted and transient refresh errors preserve authentication. Browser checks used local data; live deployment verification is recorded separately when available.

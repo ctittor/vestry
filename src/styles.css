@@ -4825,5 +4825,38 @@ small {
   }
 }
 
-.test-deployment-banner { padding: 10px 20px; background: #fff4d8; color: #5b410e; border-bottom: 1px solid #dfc485; font-size: 13px; line-height: 1.5; text-align: center; }
-.test-deployment-banner strong, .test-deployment-banner span { display: block; }
+.test-deployment-banner {
+  padding: 10px 20px;
+  background: #fff4d8;
+  color: #5b410e;
+  border-bottom: 1px solid #dfc485;
+  font-size: 13px;
+  line-height: 1.5;
+  text-align: center;
+}
+.test-deployment-banner strong,
+.test-deployment-banner span {
+  display: block;
+}
+
+.mfa-required-banner {
+  margin: 20px 28px 0;
+  padding: 18px 22px;
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  border: 1px solid #d7c187;
+  border-radius: 10px;
+  background: #fff4d8;
+  color: #5b410e;
+}
+.mfa-required-banner p {
+  margin: 4px 0 0;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.nav-item[aria-disabled="true"] {
+  opacity: 0.6;
+  cursor: not-allowed;
+}

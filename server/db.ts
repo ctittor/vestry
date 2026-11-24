@@ -15,6 +15,14 @@ export const pool = new pg.Pool({
   idleTimeoutMillis: 5000,
   statement_timeout: 10000,
 });
+pool.on("error", (error) =>
+  console.error(
+    JSON.stringify({
+      event: "database.idle_connection_failed",
+      code: (error as { code?: string }).code,
+    }),
+  ),
+);
 if (process.env.VERCEL) attachDatabasePool(pool);
 export type DB = pg.PoolClient;
 export async function scoped<T>(

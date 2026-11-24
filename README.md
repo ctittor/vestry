@@ -1,5 +1,7 @@
 # Vestry
 
+For one-command local startup and recovery, see [local development](docs/LOCAL_DEVELOPMENT.md). Login and dashboard requests now use destination-based origin checks without an APP_ORIGIN setting.
+
 **Testing without AWS:** follow the [Vercel + Neon test setup](docs/VERCEL_TESTING.md). It supports core records and role testing; uploads, OCR and outgoing email are unavailable.
 
 For Vercel, follow the [step-by-step deployment and database migration guide](docs/VERCEL_DEPLOYMENT.md). The private verified PostgreSQL dump stays under `data/migration/` and is excluded from Git.
@@ -19,7 +21,7 @@ The [forane guide and research](docs/FORANE_GUIDE.md) covers Syro-Malabar respon
 5. `npm run db:migrate`
 6. Set a private `SEED_PASSWORD` in `.env`, then `npm run db:seed` for **synthetic development data only**.
 7. `npm run dev`
-8. Open **http://localhost:5173**. Use `operator@vestry.example` for super administration, `archdiocese@vestry.example` for archdiocese administration, or `admin@stmary.example`, `priest@stmary.example`, `clerk@stmary.example`, `auditor@stmary.example` for parish access, with the local `SEED_PASSWORD`. The second isolated parish uses `@stjoseph.example`. Central users select a parish from the directory before accessing its records.
+8. Open **http://localhost:4000** (redirects to the development website on port 5173). Use `operator@vestry.example` for super administration, `archdiocese@vestry.example` for archdiocese administration, or `admin@stmary.example`, `priest@stmary.example`, `clerk@stmary.example`, `auditor@stmary.example` for parish access, with the local `SEED_PASSWORD`. The second isolated parish uses `@stjoseph.example`. Central users select a parish from the directory before accessing its records.
 
 The development UI uses port 5173 and exits if it is already occupied, instead of switching to an address rejected by the API's origin protection. If Vestry is already running, reuse **http://localhost:5173**.
 

@@ -219,6 +219,7 @@ function useData(path: string | null, deps: unknown[] = [], pollMs = 0) {
       api(path)
         .then((d) => {
           if (live) {
+            setError("");
             setData(d);
             pending = Boolean(
               d.items?.some((item: Row) =>
@@ -373,7 +374,14 @@ function App() {
         setCsrf(s.csrf);
         setSession(s);
       })
-      .catch(() => setSession(null))
+      .catch((error) => {
+        if (error.status === 401) setSession(null);
+        else
+          setToast(
+            error.message ||
+              "Unable to refresh the workspace. Try again shortly.",
+          );
+      })
       .finally(() => setInitial(false));
   }, []);
   useEffect(refresh, [refresh]);
@@ -412,6 +420,13 @@ function App() {
     return () => document.removeEventListener("keydown", h);
   }, []);
   const navigate = (v: string) => {
+    if (session?.mfa_required && v !== "My account") {
+      setToast(
+        "Complete authenticator setup in My account to unlock the workspace.",
+      );
+      setDrawer(false);
+      return;
+    }
     location.hash = encodeURIComponent(v);
     setPage(v);
     setDrawer(false);
@@ -560,6 +575,7 @@ function App() {
                         <button
                           key={name}
                           aria-label={name}
+                          aria-disabled={session.mfa_required || undefined}
                           className={
                             "nav-item " + (current === name ? "active" : "")
                           }
@@ -640,7 +656,21 @@ function App() {
               <span className="top-avatar">{session.user.name[0]}</span>
             </div>
           </header>
-          {platform && <OversightBanner />}
+          {session.mfa_required && (
+            <div className="mfa-required-banner" role="alert">
+              <ShieldCheck size={20} />
+              <div>
+                <strong>
+                  Complete security setup to unlock your workspace.
+                </strong>
+                <p>
+                  Your role requires an authenticator. Set it up below; records
+                  will become available after verification.
+                </p>
+              </div>
+            </div>
+          )}
+          {platform && !session.mfa_required && <OversightBanner />}
           <main
             id="main"
             tabIndex={-1}
@@ -2284,9 +2314,12 @@ function MemberPhotoPicker({
     if (!file) return;
     if (
       !["image/jpeg", "image/png", "image/webp"].includes(file.type) ||
-      file.size > (import.meta.env.VITE_SERVERLESS === "true" ? 4 : 5) * 1024 * 1024
+      file.size >
+        (import.meta.env.VITE_SERVERLESS === "true" ? 4 : 5) * 1024 * 1024
     ) {
-      setError(`Choose a JPEG, PNG or WebP photo up to ${import.meta.env.VITE_SERVERLESS === "true" ? 4 : 5} MB.`);
+      setError(
+        `Choose a JPEG, PNG or WebP photo up to ${import.meta.env.VITE_SERVERLESS === "true" ? 4 : 5} MB.`,
+      );
       return;
     }
     setError("");
@@ -7673,8 +7706,11 @@ createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     {import.meta.env.VITE_TEST_DEPLOYMENT === "true" && (
       <div className="test-deployment-banner" role="status">
-        <strong>Test deployment ? Synthetic data only</strong>
-        <span>Uploads, original files, OCR and outgoing email are unavailable. In-app change alerts remain active.</span>
+        <strong>Test deployment · Synthetic data only</strong>
+        <span>
+          Uploads, original files, OCR and outgoing email are unavailable.
+          In-app change alerts remain active.
+        </span>
       </div>
     )}
     <App />

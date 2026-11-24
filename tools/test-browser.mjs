@@ -22,7 +22,7 @@ try {
   if (!(await ready())) {
     preview = spawn(
       process.execPath,
-      ["--import", "tsx", "tools/preview.mjs"],
+      ["--import", "tsx", process.env.QA_PRODUCTION_TEST === "true" ? "tools/production-test-preview.mjs" : "tools/preview.mjs"],
       { stdio: "inherit" },
     );
     const deadline = Date.now() + 90000;

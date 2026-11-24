@@ -25,7 +25,7 @@ async function request(
   const response = await fetch(base + path, {
     method,
     headers: {
-      Origin: process.env.APP_ORIGIN || "http://localhost:5173",
+      Origin: new URL(base).origin,
       "Content-Type": "application/json",
       ...(client ? { Cookie: client.cookie, "X-CSRF-Token": client.csrf } : {}),
       ...(client?.parish ? { "X-Parish-Id": client.parish } : {}),

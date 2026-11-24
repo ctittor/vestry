@@ -29,13 +29,19 @@ export async function api(path: string, options: RequestInit = {}) {
     if (res.status === 401 && typeof window !== "undefined")
       window.dispatchEvent(new Event("vestry-session-expired"));
     const body = await res.json().catch(() => null);
-    const fallback = res.status >= 500
-      ? `The API is unavailable (HTTP ${res.status}). Open /api/v1/health for deployment details.`
-      : `Request failed (HTTP ${res.status}).`;
-    throw new Error(typeof body?.error === "string" ? body.error : fallback);
+    const fallback =
+      res.status >= 500
+        ? `The API is unavailable (HTTP ${res.status}). Open /api/v1/health for deployment details.`
+        : `Request failed (HTTP ${res.status}).`;
+    throw Object.assign(
+      new Error(typeof body?.error === "string" ? body.error : fallback),
+      { status: res.status, code: body?.code },
+    );
   }
   if (!res.headers.get("content-type")?.includes("application/json"))
-    throw new Error("The API returned an unexpected response. Check Vercel API routing at /api/v1/health.");
+    throw new Error(
+      "The API returned an unexpected response. Check Vercel API routing at /api/v1/health.",
+    );
   return res.json();
 }
 export const post = (path: string, body: unknown) =>

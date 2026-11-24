@@ -73,21 +73,21 @@ Bootstrap uses DATABASE_URL and runs once. Remove bootstrap credentials afterwar
 
 ## 4. Import in Vercel
 
-This repository currently defaults Vercel to the owner?s AWS-free test deployment. For a full production deployment, explicitly set TEST_DEPLOYMENT=false and configure all services below. Set APP_ORIGIN to your actual production domain.
+This repository currently defaults Vercel to the owner?s AWS-free test deployment. For a full production deployment, explicitly set TEST_DEPLOYMENT=false and configure all services below. Domain changes do not require application origin settings.
 
 1. Sign in to Vercel and choose **Add New → Project**.
 2. Connect GitHub and import **ctittor/vestry**: https://github.com/ctittor/vestry.
 3. Root directory: repository root. Framework: **Vite**. Node.js: **24.x**. Enable Fluid compute. The checked-in configuration supplies npm ci, npm run build, output dist, API routing and a 60-second API duration. Do not use a Docker start command.
-4. Choose your final production domain. Set APP_ORIGIN to its exact HTTPS origin without a trailing slash, for example https://vestry-yourteam.vercel.app.
-5. Add the variables below for **Production**. Keep Preview deployments isolated from production databases/storage; use separate test services and a matching origin, or leave previews without live credentials.
-6. Click **Deploy**. The build does not run migrations. Pushes to main will trigger future builds. To change domains, update APP_ORIGIN and redeploy.
+4. Assign your production domain in Vercel. Same-origin validation follows the accessed domain automatically.
+5. Add the variables below for **Production**. Keep Preview deployments isolated from production databases/storage; use separate test services, or leave previews without live credentials.
+6. Click **Deploy**. The build does not run migrations. Pushes to main will trigger future builds. Domain aliases do not need an application configuration change.
 
 ## 5. Vercel environment variables
 
 | Variable | Value |
 | --- | --- |
 | NODE_ENV | production |
-| APP_ORIGIN | Exact production HTTPS origin |
+| PUBLIC_APP_URL | Optional trusted email-link base for self-hosted workers; Vercel uses platform metadata automatically |
 | DATABASE_URL | TLS URL for vestry_app, preferably a supported pooled endpoint |
 | COOKIE_SECURE | true |
 | MFA_ENCRYPTION_KEY | Random 64 hex characters; retain source key if migrating records |
@@ -141,3 +141,7 @@ These files do not create a live Vercel project or cloud services; complete the 
 ## Build dependencies under NODE_ENV=production
 
 The Vercel install command must be `npm ci --include=dev`. TypeScript, Vite and type definitions are required during the build even though the deployed runtime is production. The repository config sets this explicitly. If the dashboard overrides Install Command, update the override too. Redeploy the latest commit with the existing build cache disabled after an earlier install omitted development dependencies. Keep NODE_ENV=production.
+
+## Domain-independent requests
+
+APP_ORIGIN is no longer required for request validation or runtime startup. Browser origins are checked against the actual destination Host/scheme, with CSRF verification for authenticated mutations. Vercel discovers its domains automatically. See VERCEL_TESTING.md for the limited test profile. Self-hosted production SMTP/worker deployments can use PUBLIC_APP_URL for safe background email links, with APP_ORIGIN retained as a legacy fallback for that purpose only. Full production keeps privileged MFA enforcement; synthetic test deployments allow optional enrollment. See LOCAL_DEVELOPMENT.md for repaired local startup.

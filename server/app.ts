@@ -1,5 +1,4 @@
-import { deploymentOrigins } from "../shared/deployment.js";
-import { testDeployment } from "./runtime.js";
+import { testDeployment, requiresMfa } from "./runtime.js";
 import "dotenv/config";
 import express, {
   type Request,
@@ -40,7 +39,7 @@ import {
   centralRole,
 } from "./security.js";
 import { putOriginal, getOriginal, scan } from "./storage.js";
-import { isAllowedOrigin } from "./origin.js";
+import { isAllowedOrigin, requestTargetOrigin, publicApplicationOrigin } from "./origin.js";
 
 type User = {
   id: string;
@@ -125,11 +124,12 @@ const fieldSchema = z.object({
   required: z.boolean().default(false),
   type: z.enum(["text", "date", "number"]).default("text"),
 });
-const origin = () => process.env.APP_ORIGIN || "http://localhost:5173";
+const origin = publicApplicationOrigin;
 const permittedOrigin = (req: Request) =>
-  isAllowedOrigin(req.get("Origin"), origin(), process.env.NODE_ENV, deploymentOrigins());
+  isAllowedOrigin(req.get("Origin"), requestTargetOrigin(req) || "", process.env.NODE_ENV);
 const app = express();
 if (process.env.VERCEL) app.set("trust proxy", 1);
+else if (process.env.TRUST_PROXY) app.set("trust proxy", process.env.TRUST_PROXY.split(",").map(value=>value.trim()));
 const dummyPasswordHash = hash(token());
 async function securityEvent(req: Request, action: string, userId: string) {
   await pool.query(
@@ -182,7 +182,7 @@ api.get("/health", async (_req, res) => {
     const { rows: [schema] } = await pool.query("SELECT to_regclass('public.users') AS users, to_regclass('public.foranes') AS foranes, to_regclass('public.persons') AS persons");
     if (!schema.users || !schema.foranes || !schema.persons)
       return res.status(503).json({code:"DATABASE_SCHEMA_MISSING",error:"PostgreSQL is reachable but migrations are missing. Run db:migrate against this database."});
-    res.json({ status: "ok" });
+    res.json({ status: "ok", app: "vestry", environment: process.env.NODE_ENV, test_deployment: testDeployment() });
   } catch (cause) {
     console.error(JSON.stringify({event:"database.health_failed",code:(cause as {code?:string}).code}));
     res.status(503).json({code:"DATABASE_UNAVAILABLE",error:"The API is running but cannot connect to PostgreSQL. Verify DATABASE_URL and database availability in Vercel."});
@@ -365,15 +365,7 @@ api.use(async (req, res, next) => {
   req.csrf = s.csrf;
   req.sessionId = s.session_id;
   if (
-    process.env.NODE_ENV === "production" &&
-    [
-      "admin",
-      "priest",
-      "platform_admin",
-      "archdiocese_admin",
-      "forane_admin",
-    ].includes(s.role) &&
-    !s.mfa_enabled &&
+    requiresMfa(s) &&
     !req.path.startsWith("/auth/")
   )
     return next(
@@ -497,16 +489,8 @@ api.get("/auth/me", async (req, res) => {
           )
         : null,
     csrf: req.csrf,
-    mfa_required:
-      process.env.NODE_ENV === "production" &&
-      [
-        "admin",
-        "priest",
-        "platform_admin",
-        "archdiocese_admin",
-        "forane_admin",
-      ].includes(req.user.role) &&
-      !req.user.mfa_enabled,
+    test_deployment: testDeployment(),
+    mfa_required: requiresMfa(req.user),
   });
 });
 api.post("/auth/logout", async (req, res) => {
@@ -519,7 +503,7 @@ api.get("/auth/sessions", async (req, res) =>
   res.json(
     (
       await pool.query(
-        "SELECT id,device,created_at,expires_at FROM sessions WHERE user_id=$1 ORDER BY created_at DESC",
+        "SELECT id,device,created_at,expires_at FROM sessions WHERE user_id=$1 AND expires_at>now() ORDER BY created_at DESC",
         [req.user.id],
       )
     ).rows.map((s) => ({ ...s, current: s.id === req.sessionId })),
@@ -2265,6 +2249,8 @@ api.get("/openapi.json", (_req, res) =>
 );
 
 api.use((_req, _res, next) => next(new HttpError(404, "API route not found.")));
+if (process.env.NODE_ENV === "development" && process.env.SERVE_CLIENT !== "true")
+  app.get("/", (req,res)=>res.redirect(307, "http://localhost:5173" + req.originalUrl));
 if (
   (process.env.NODE_ENV === "production" && !process.env.VERCEL) ||
   process.env.SERVE_CLIENT === "true"

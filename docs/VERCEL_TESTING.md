@@ -1,111 +1,45 @@
-﻿# AWS-free Vercel test deployment
+﻿# Vercel testing without domain-specific setup
 
-Use Vercel for the website/API and Neon for PostgreSQL. No AWS, S3, Redis, SMTP or external worker is needed for this limited test mode. Use synthetic data only and keep a separate database from any real deployment.
+The app uses Vercel + Neon PostgreSQL for synthetic testing. TEST_DEPLOYMENT=true enables the limited test profile. Uploads, original-file downloads, OCR and outgoing email are unavailable; normal records, in-app alerts and parish/forane isolation remain active.
 
-Works: logins, role/parish/forane isolation, archdiocese/forane/parish management, units, households, members without photos, registers, reports, audit history and in-app change alerts.
+## Domain changes
 
-Unavailable: uploads, original-file downloads, profile-photo uploads, OCR, invitation/reset email delivery and email change warnings. File operations fail explicitly rather than saving temporary files. Encrypted email requests remain queued and are not marked delivered. Use seeded accounts to test logins. MFA, secure cookies, change reasons, permissions and row-level security remain enabled. The interface shows a test banner.
+APP_ORIGIN and domain allowlists are no longer required for login or dashboard requests. Every mutating request checks the browser Origin against the actual destination scheme/Host, and authenticated changes still require the session CSRF token. Unrelated origins and forged X-Forwarded-Host values are rejected. Vercel supplies the destination host and HTTPS transport. There are no hardcoded project domains or wildcard vercel.app permissions.
 
-## 1. Import the repository in Vercel
+For another server behind a TLS reverse proxy, preserve the incoming Host and configure TRUST_PROXY with the proxy's IP/CIDR (or loopback for a local proxy). Forward X-Forwarded-Proto only from that trusted proxy. This is infrastructure configuration, independent of the domain name.
 
-Add New → Project → import ctittor/vestry. Choose the repository root, Vite and Node.js 24.x. The checked-in configuration supplies npm ci, npm run build and output dist. Choose a project name and record its production domain. If the first build is already deployed without variables, the API will remain unavailable until you add variables and redeploy.
+Vercel background email links use VERCEL_PROJECT_PRODUCTION_URL automatically. For production SMTP on a self-hosted server/worker without platform metadata, PUBLIC_APP_URL supplies the public email-link base. APP_ORIGIN remains a legacy fallback for those links only. Incoming Host headers are never used to generate password-reset email URLs.
 
-## 2. Create the test PostgreSQL database
+## Database setup
 
-Create a Neon project with PostgreSQL 18 and a fresh empty database such as vestry_test, either through Vercel Marketplace or the Neon console. In Connect select the owner role, turn connection pooling OFF and copy the direct owner PostgreSQL URI. A blank test database is simpler than restoring a development dump and does not create references to missing originals.
+1. Import ctittor/vestry in Vercel with framework Vite, Node 24.x and the repository root.
+2. Create an isolated PostgreSQL 18 database in Neon. Copy its direct owner connection URL.
+3. Configure local MIGRATION_DATABASE_URL with that owner URI, DB_APP_PASSWORD with a random URL-safe password (20–128 characters), and DATABASE_URL with the same database using vestry_app and that password.
+4. From your computer run npm run db:migrate. This creates the restricted role and schema; do not use a provider owner role in the API.
+5. For a fresh synthetic database, set a private SEED_PASSWORD (14+ characters), keep local NODE_ENV=development and run npm run db:seed. Existing accounts keep their original passwords. Never seed real production records.
 
-On your computer open F:\church-records\.env. Keep a private backup if changing an existing local setup. Set:
+## Vercel settings
 
-```dotenv
-NODE_ENV=development
-MIGRATION_DATABASE_URL=YOUR_DIRECT_NEON_OWNER_URI
-DB_APP_PASSWORD=YOUR_NEW_RANDOM_URL_SAFE_RUNTIME_PASSWORD
-DATABASE_URL=YOUR_DIRECT_NEON_URI_USING_vestry_app_AND_THE_RUNTIME_PASSWORD
-SEED_PASSWORD=YOUR_PRIVATE_TEST_PASSWORD_AT_LEAST_14_CHARACTERS
-```
-
-Generate independent passwords/keys with:
-
-```powershell
-node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
-```
-
-Initially vestry_app does not exist; that is expected. The migration connects using the owner URI and creates the restricted role. Construct DATABASE_URL using the same host/database/SSL parameters as the owner URI, with username vestry_app and password matching DB_APP_PASSWORD. Do not create vestry_app in the provider console with elevated provider-role membership. An existing vestry_app password is not changed by migrations.
-
-Run from PowerShell:
-
-```powershell
-Set-Location F:\church-records
-npm ci
-npm run db:migrate
-npm run db:seed
-```
-
-Seed only this isolated test database. Keep NODE_ENV=development in this local shell for seeding; Vercel itself must use NODE_ENV=production. If you already restored the dump, do not restore again: apply migrations and use the retained account passwords. Seeding does not reset existing passwords.
-
-## 3. Add Vercel environment variables
-
-In the Vercel project → Settings → Environment Variables, add these for the Production deployment:
-
-| Name | Value |
+| Variable | Value |
 | --- | --- |
 | NODE_ENV | production |
 | TEST_DEPLOYMENT | true |
 | STORAGE_DRIVER | disabled |
-| DATABASE_URL | Neon TLS connection URI for restricted vestry_app, not the owner |
-| APP_ORIGIN | Exact production HTTPS origin, e.g. https://YOUR-PROJECT.vercel.app, without trailing slash |
+| DATABASE_URL | Hosted TLS PostgreSQL URL using vestry_app, preferably the supported pooled endpoint |
 | COOKIE_SECURE | true |
-| MFA_ENCRYPTION_KEY | Your current private 64-hex-character key from .env |
-| CRON_SECRET | Another independent random secret, at least 32 characters |
+| MFA_ENCRYPTION_KEY | Existing private 64-hex-character key, preserved when moving records |
+| CRON_SECRET | Independent random secret, at least 32 characters |
 
-For DATABASE_URL use the provider's pooled endpoint for vestry_app if available and supported. Confirm any URL added automatically by the Neon integration is replaced with the restricted runtime role, not the owner. Never add owner/migration/bootstrap/seed credentials or DB_APP_PASSWORD as separate Vercel variables. The runtime password is already inside DATABASE_URL. Do not put secrets in VITE_ variables.
+Do not add owner/migration/bootstrap/seed credentials to Vercel. No AWS, Redis, SMTP or scanner is required for this limited profile. Use npm ci --include=dev for the install command, npm run build for the build, and dist for output. Deploy the latest main commit. Build logs identify the source revision with [Vestry build v2]. Retrying an older deployment rebuilds that older source; create a new deployment from main if needed.
 
-You do not need S3 credentials, REDIS_URL, SMTP settings or CLAMAV settings in this mode. Do not set NODE_ENV=development in Vercel. The test flag explicitly disables file/OCR/email services while keeping normal production authentication safeguards.
+## Navigation and MFA
 
-## 4. Redeploy and sign in
+Synthetic test deployments allow privileged demo accounts to navigate without mandatory MFA enrollment. An account that already enabled MFA must still supply its authenticator code at login. Full production (TEST_DEPLOYMENT=false) retains mandatory MFA for privileged roles. It displays an explicit setup banner and locked navigation until enrollment instead of silently showing My account for every tab.
 
-Deployments → latest deployment → Redeploy so the runtime and compiled banner use the new variables. Open /api/v1/health and expect {"status":"ok"}.
+## Verify
 
-Use these seeded emails with the private SEED_PASSWORD selected before the first seed:
+Open /api/v1/health, then sign in with a seeded account. The test emails include operator@vestry.example, archdiocese@vestry.example, forane@vestry.example, admin@stmary.example and admin@stjoseph.example, using the private seed password. Click every permitted sidebar module; the breadcrumb and content must change. Production/test policies are covered separately in API and browser regression tests.
 
-- Super administrator: operator@vestry.example
-- Archdiocese: archdiocese@vestry.example
-- Forane: forane@vestry.example
-- Parish: admin@stmary.example
-- Second isolated parish: admin@stjoseph.example
+The runtime returns useful JSON setup errors for missing keys, unsafe database roles, missing migrations and unavailable databases. Passwords and connection URLs are never included in public diagnostics.
 
-Production privileged roles still require MFA enrollment. Set it up through the account/security interface when prompted. Keep this test database separate; do not use real parish/member data. Test accounts have password login and do not need invitation email to be delivered.
-
-## 5. Troubleshooting
-
-- Missing SMTP/S3 startup error: confirm TEST_DEPLOYMENT=true is set for the deployment's environment and redeploy the current main branch.
-- Database/authentication error: ensure DATABASE_URL uses vestry_app with the password created by db:migrate, the correct test database and TLS options.
-- Origin error: APP_ORIGIN must exactly match the address in the browser. Use the stable production domain; preview domains need their own settings and isolated services.
-- Login password fails after re-seeding: seed does not change an existing account password. Use its original password; email resets are unavailable in this mode.
-- Upload/OCR/email does not work: these services are deliberately unavailable in this test mode; the banner lists the limitation.
-
-For a complete production installation later, use a fresh production database and follow VERCEL_DEPLOYMENT.md with persistent object storage, scanner, SMTP and a worker, then remove TEST_DEPLOYMENT. Do not enable delivery of an old test database's queued messages to real recipients.
-
-References: https://vercel.com/docs/marketplace-storage and https://neon.com/docs/connect/connect-from-any-app.
-
-## Current test site: vestry-j794.vercel.app
-
-The repository supplies non-secret Vercel defaults for this test site: APP_ORIGIN=https://vestry-xi.vercel.app, COOKIE_SECURE=true, TEST_DEPLOYMENT=true and STORAGE_DRIVER=disabled. Explicit project variables override them. Build and API startup apply the same defaults. Secrets are never supplied in source.
-
-The startup error "MFA_ENCRYPTION_KEY must be 64 hex characters" means the Vercel variable is missing or invalid. Set its exact existing local .env value under Settings ? Environment Variables ? Production, then redeploy. Do not paste the variable name, surrounding quotes or whitespace into the value field. A private .env.vercel.local file can be imported through Vercel?s environment-variable import interface; this file is ignored by Git and contains the existing key and a cron secret. Keep your hosted restricted DATABASE_URL separately configured: the local localhost URL does not work on Vercel.
-
-The API now returns JSON configuration errors with setting names, never secret values. /api/v1/health also distinguishes a missing schema from an unavailable database. A remaining API_STARTUP_FAILED code requires checking Function Logs for api.startup_failed.
-
-Before a real production rollout, explicitly set TEST_DEPLOYMENT=false, configure production services, and set the real APP_ORIGIN. For any different test domain, set APP_ORIGIN to its exact HTTPS origin.
-
-## Build dependencies under NODE_ENV=production
-
-The Vercel install command must be `npm ci --include=dev`. TypeScript, Vite and type definitions are required during the build even though the deployed runtime is production. The repository config sets this explicitly. If the dashboard overrides Install Command, update the override too. Redeploy the latest commit with the existing build cache disabled after an earlier install omitted development dependencies. Keep NODE_ENV=production.
-
-## Repeated old TypeScript error
-
-If logs still show the raw missing node_modules/typescript/bin/tsc error without the newer dependency diagnostic or [Vestry build v2] marker, check the deployment Source commit and connected repository. Creating a deployment from the main branch uses the latest branch source; retrying an older deployment rebuilds that deployment?s source. In Deployments ? Create Deployment, enter https://github.com/ctittor/vestry/tree/main, then verify the Source commit. The new build prints [Vestry build v2] source=<commit>. Use npm ci --include=dev and disable existing build cache when retrying the correct source.
-
-## Mapped domains and request origins
-
-The current canonical test URL is https://vestry-xi.vercel.app. Exact origins for the shown project aliases are trusted; Vercel-provided VERCEL_URL, VERCEL_BRANCH_URL and VERCEL_PROJECT_PRODUCTION_URL also identify this deployment?s exact URLs. No wildcard vercel.app origin or request Host header is trusted. A retained APP_ORIGIN=https://vestry-j794.vercel.app setting is migrated to the current project production URL. Explicit other custom origins remain unchanged. For additional custom domains, set APP_ALLOWED_ORIGINS to a comma-separated list of full HTTPS origins and redeploy. Sessions remain specific to the hostname used to sign in.
+Before using real church records, use a separate production database, set TEST_DEPLOYMENT=false, and configure persistent object storage, scanning, SMTP and the worker as described in VERCEL_DEPLOYMENT.md.

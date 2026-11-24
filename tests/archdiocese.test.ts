@@ -24,7 +24,7 @@ async function request(
   const response = await fetch(base + path, {
     method,
     headers: {
-      Origin: process.env.APP_ORIGIN || "http://localhost:5173",
+      Origin: new URL(base).origin,
       "Content-Type": "application/json",
       ...(client ? { Cookie: client.cookie, "X-CSRF-Token": client.csrf } : {}),
       ...(client?.parish ? { "X-Parish-Id": client.parish } : {}),
@@ -330,16 +330,21 @@ test("central provisioning, archdiocese bounds, parish isolation and transaction
       ]),
     ),
   );
-  const environment = process.env.NODE_ENV;
+  const environment = process.env.NODE_ENV, testing = process.env.TEST_DEPLOYMENT;
   try {
     process.env.NODE_ENV = "production";
+    process.env.TEST_DEPLOYMENT = "false";
     assert.equal(
       (await request("/archdiocese/overview", diocese)).status,
       403,
       "production central access requires MFA",
     );
     assert.equal((await request("/auth/me", diocese)).body.mfa_required, true);
+    process.env.TEST_DEPLOYMENT = "true";
+    assert.equal((await request("/auth/me", diocese)).body.mfa_required, false);
+    assert.equal((await request("/archdiocese/overview", diocese)).status, 200);
   } finally {
     process.env.NODE_ENV = environment;
+    if (testing === undefined) delete process.env.TEST_DEPLOYMENT; else process.env.TEST_DEPLOYMENT = testing;
   }
 });
