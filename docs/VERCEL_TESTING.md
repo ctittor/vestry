@@ -1,6 +1,6 @@
 ﻿# Vercel testing without domain-specific setup
 
-The app uses Vercel + Neon PostgreSQL for synthetic testing. TEST_DEPLOYMENT=true enables the limited test profile. Uploads, original-file downloads, OCR and outgoing email are unavailable; normal records, in-app alerts and parish/forane isolation remain active.
+The app uses Vercel + Neon PostgreSQL for synthetic testing. TEST_DEPLOYMENT=true enables the limited test profile. Original register uploads/downloads, OCR and outgoing email are unavailable; normal records, in-app alerts and parish/forane isolation remain active.
 
 ## Domain changes
 
@@ -31,6 +31,8 @@ Vercel background email links use VERCEL_PROJECT_PRODUCTION_URL automatically. F
 | CRON_SECRET | Independent random secret, at least 32 characters |
 
 Do not add owner/migration/bootstrap/seed credentials to Vercel. No AWS, Redis, SMTP or scanner is required for this limited profile. Use npm ci --include=dev for the install command, npm run build for the build, and dist for output. Deploy the latest main commit. Build logs identify the source revision with [Vestry build v2]. Retrying an older deployment rebuilds that older source; create a new deployment from main if needed.
+
+Small re-encoded church, building and account photos are stored privately in PostgreSQL and work in this profile. See DIRECTORY_GUIDE.md. Apply migration 016 before deploying the directory update.
 
 ## Navigation and MFA
 

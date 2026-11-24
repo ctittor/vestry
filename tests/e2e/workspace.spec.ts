@@ -177,7 +177,7 @@ test("desktop workspace, navigation, search and manual record draft", async ({
   expect(accessibility.violations).toEqual([]);
   await page.getByRole("button", { name: "Members", exact: true }).click();
   await expect(
-    page.getByRole("heading", { name: "A community, by name." }),
+    page.getByRole("heading", { name: "Every person. Every generation." }),
   ).toBeVisible();
   await page.getByLabel("Search members").fill("Clara");
   await expect(page.getByText("Clara Mathew", { exact: true })).toBeVisible();
@@ -232,7 +232,7 @@ test("mobile navigation and responsive layout", async ({ page }) => {
   await page.getByRole("button", { name: "Open navigation" }).click();
   await page.getByRole("button", { name: "Members", exact: true }).click();
   await expect(
-    page.getByRole("heading", { name: "A community, by name." }),
+    page.getByRole("heading", { name: "Every person. Every generation." }),
   ).toBeVisible();
   expect(
     await page.evaluate(

@@ -42,8 +42,10 @@ async function prepare() {
     await db.connect();
     const {
       rows: [schema],
-    } = await db.query("SELECT to_regclass('public.users') AS users");
-    if (!schema.users)
+    } = await db.query(
+      "SELECT to_regclass('public.users') AS users, to_regclass('public.identity_photos') AS identity_photos",
+    );
+    if (!schema.users || !schema.identity_photos)
       throw new Error("Database schema is missing. Run npm run db:migrate.");
     const {
       rows: [users],

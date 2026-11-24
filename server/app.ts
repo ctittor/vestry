@@ -1,3 +1,5 @@
+import directoryRouter from "./directory.js";
+import { memberDirectory } from "./member-directory.js";
 import { testDeployment, requiresMfa } from "./runtime.js";
 import "dotenv/config";
 import express, {
@@ -39,7 +41,11 @@ import {
   centralRole,
 } from "./security.js";
 import { putOriginal, getOriginal, scan } from "./storage.js";
-import { isAllowedOrigin, requestTargetOrigin, publicApplicationOrigin } from "./origin.js";
+import {
+  isAllowedOrigin,
+  requestTargetOrigin,
+  publicApplicationOrigin,
+} from "./origin.js";
 
 type User = {
   id: string;
@@ -92,6 +98,8 @@ const personSchema = z.object({
     .nullable()
     .optional(),
   phone: optional,
+  state: z.string().trim().max(200).default(""),
+  place: z.string().trim().max(200).default(""),
   address: optional,
   status: z
     .enum(["active", "inactive", "deceased", "transferred"])
@@ -126,10 +134,18 @@ const fieldSchema = z.object({
 });
 const origin = publicApplicationOrigin;
 const permittedOrigin = (req: Request) =>
-  isAllowedOrigin(req.get("Origin"), requestTargetOrigin(req) || "", process.env.NODE_ENV);
+  isAllowedOrigin(
+    req.get("Origin"),
+    requestTargetOrigin(req) || "",
+    process.env.NODE_ENV,
+  );
 const app = express();
 if (process.env.VERCEL) app.set("trust proxy", 1);
-else if (process.env.TRUST_PROXY) app.set("trust proxy", process.env.TRUST_PROXY.split(",").map(value=>value.trim()));
+else if (process.env.TRUST_PROXY)
+  app.set(
+    "trust proxy",
+    process.env.TRUST_PROXY.split(",").map((value) => value.trim()),
+  );
 const dummyPasswordHash = hash(token());
 async function securityEvent(req: Request, action: string, userId: string) {
   await pool.query(
@@ -179,13 +195,44 @@ const api = express.Router();
 app.use("/api/v1", api);
 api.get("/health", async (_req, res) => {
   try {
-    const { rows: [schema] } = await pool.query("SELECT to_regclass('public.users') AS users, to_regclass('public.foranes') AS foranes, to_regclass('public.persons') AS persons");
-    if (!schema.users || !schema.foranes || !schema.persons)
-      return res.status(503).json({code:"DATABASE_SCHEMA_MISSING",error:"PostgreSQL is reachable but migrations are missing. Run db:migrate against this database."});
-    res.json({ status: "ok", app: "vestry", environment: process.env.NODE_ENV, test_deployment: testDeployment() });
+    const {
+      rows: [schema],
+    } = await pool.query(
+      "SELECT to_regclass('public.users') AS users, to_regclass('public.foranes') AS foranes, to_regclass('public.persons') AS persons, to_regclass('public.identity_photos') AS identity_photos",
+    );
+    if (
+      !schema.users ||
+      !schema.foranes ||
+      !schema.persons ||
+      !schema.identity_photos
+    )
+      return res
+        .status(503)
+        .json({
+          code: "DATABASE_SCHEMA_MISSING",
+          error:
+            "PostgreSQL is reachable but migrations are missing. Run db:migrate against this database.",
+        });
+    res.json({
+      status: "ok",
+      app: "vestry",
+      environment: process.env.NODE_ENV,
+      test_deployment: testDeployment(),
+    });
   } catch (cause) {
-    console.error(JSON.stringify({event:"database.health_failed",code:(cause as {code?:string}).code}));
-    res.status(503).json({code:"DATABASE_UNAVAILABLE",error:"The API is running but cannot connect to PostgreSQL. Verify DATABASE_URL and database availability in Vercel."});
+    console.error(
+      JSON.stringify({
+        event: "database.health_failed",
+        code: (cause as { code?: string }).code,
+      }),
+    );
+    res
+      .status(503)
+      .json({
+        code: "DATABASE_UNAVAILABLE",
+        error:
+          "The API is running but cannot connect to PostgreSQL. Verify DATABASE_URL and database availability in Vercel.",
+      });
   }
 });
 api.post("/auth/login", authLimit, async (req, res) => {
@@ -364,10 +411,7 @@ api.use(async (req, res, next) => {
   };
   req.csrf = s.csrf;
   req.sessionId = s.session_id;
-  if (
-    requiresMfa(s) &&
-    !req.path.startsWith("/auth/")
-  )
+  if (requiresMfa(s) && !req.path.startsWith("/auth/"))
     return next(
       new HttpError(
         403,
@@ -488,6 +532,16 @@ api.get("/auth/me", async (req, res) => {
               ).rows[0],
           )
         : null,
+    profile_photo_version: await officeScoped(
+      req.user,
+      async (db) =>
+        (
+          await db.query(
+            "SELECT version FROM identity_photos WHERE kind='user' AND entity_id=$1",
+            [req.user.id],
+          )
+        ).rows[0]?.version || 0,
+    ),
     csrf: req.csrf,
     test_deployment: testDeployment(),
     mfa_required: requiresMfa(req.user),
@@ -566,6 +620,7 @@ function permit(permission: string) {
       ? next()
       : next(new HttpError(403, "Your role does not permit this action."));
 }
+api.use(directoryRouter);
 api.use(peopleRouter);
 api.use(parishRouter);
 api.use(archdioceseRouter);
@@ -691,31 +746,7 @@ api.get("/dashboard", permit("registers.view"), async (req, res) =>
   ),
 );
 api.get("/persons", permit("members.view"), async (req, res) =>
-  res.json(
-    await scoped(tenant(req), async (db) => {
-      const { p, l, offset, q } = page(req);
-      const householdId = req.query.household_id
-        ? uuid.parse(req.query.household_id)
-        : "";
-      const filter = `WHERE (p.name ILIKE $1 OR p.membership_no ILIKE $1 OR p.alternate_names ILIKE $1 OR p.local_name ILIKE $1) AND ($2::text='' OR p.household_id::text=$2)`;
-      const items = (
-        await db.query(
-          `SELECT p.*,h.name AS household_name FROM persons p LEFT JOIN households h ON h.id=p.household_id ${filter} ORDER BY p.name,p.id LIMIT $3 OFFSET $4`,
-          ["%" + q + "%", householdId, l, offset],
-        )
-      ).rows;
-      const total = Number(
-        (
-          await db.query(`SELECT count(*) FROM persons p ${filter}`, [
-            "%" + q + "%",
-            householdId,
-          ])
-        ).rows[0].count,
-      );
-      await log(req, db, "persons.list", "person", null, { query: q });
-      return { items, total, page: p, limit: l };
-    }),
-  ),
+  res.json(await memberDirectory(req)),
 );
 api.post("/persons", permit("members.create"), async (req, res) =>
   res.status(201).json(
@@ -726,7 +757,7 @@ api.post("/persons", permit("members.create"), async (req, res) =>
       const {
         rows: [r],
       } = await db.query(
-        "INSERT INTO persons(tenant_id,name,local_name,alternate_names,membership_no,household_id,birth_date,date_precision,email,phone,address,status) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING *",
+        "INSERT INTO persons(tenant_id,name,local_name,alternate_names,membership_no,household_id,birth_date,date_precision,email,phone,address,status,state,place) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) RETURNING *",
         [
           req.user.tenant_id,
           v.name,
@@ -740,6 +771,8 @@ api.post("/persons", permit("members.create"), async (req, res) =>
           v.phone,
           v.address,
           v.status,
+          v.state,
+          v.place,
         ],
       );
       await log(req, db, "person.create", "person", r.id);
@@ -757,7 +790,7 @@ api.patch("/persons/:id", permit("members.update"), async (req, res) =>
       const {
         rows: [r],
       } = await db.query(
-        "UPDATE persons SET name=$1,local_name=$2,alternate_names=$3,birth_date=$4,date_precision=$5,email=$6,phone=$7,address=$8,status=$9,household_id=$10,membership_no=$12,updated_at=now() WHERE id=$11 RETURNING *",
+        "UPDATE persons SET name=$1,local_name=$2,alternate_names=$3,birth_date=$4,date_precision=$5,email=$6,phone=$7,address=$8,status=$9,household_id=$10,membership_no=$12,state=$13,place=$14,updated_at=now() WHERE id=$11 RETURNING *",
         [
           v.name,
           v.local_name,
@@ -771,6 +804,8 @@ api.patch("/persons/:id", permit("members.update"), async (req, res) =>
           v.household_id,
           before.id,
           v.membership_no,
+          v.state,
+          v.place,
         ],
       );
       await log(req, db, "person.update", "person", r.id, {
@@ -906,18 +941,25 @@ api.get("/entries", permit("registers.view"), async (req, res) =>
           z.string().regex(/^[0-9]{4}$/),
         ])
         .parse(req.query.year || "");
-      const params = ["%" + q + "%", status, kind, year];
+      const params = [
+        "%" + q + "%",
+        status,
+        kind,
+        year,
+        "%" + String(req.query.place || "").slice(0, 200) + "%",
+        req.query.unit ? uuid.parse(req.query.unit) : "",
+      ];
       const scope =
-        "WHERE (p.name ILIKE $1 OR e.subject_name ILIKE $1 OR e.entry_no ILIKE $1 OR e.event_date ILIKE $1) AND ($3='' OR s.kind=$3)";
+        "WHERE (p.name ILIKE $1 OR e.subject_name ILIKE $1 OR e.entry_no ILIKE $1 OR e.event_date ILIKE $1) AND ($3='' OR s.kind=$3) AND coalesce(e.place,'') ILIKE $5 AND ($6='' OR h.unit_id::text=$6)";
       const yearScope =
         scope +
         " AND ($4='' OR ($4='unknown' AND e.event_year IS NULL) OR e.event_year=$4)";
       const filter = yearScope + " AND ($2='' OR e.status=$2)";
       const join =
-        "FROM entries e JOIN persons p ON p.id=e.person_id JOIN register_schemas s ON s.id=e.schema_id";
+        "FROM entries e JOIN persons p ON p.id=e.person_id JOIN register_schemas s ON s.id=e.schema_id LEFT JOIN households h ON h.id=p.household_id";
       const items = (
         await db.query(
-          `SELECT e.*,e.subject_name AS person_name,s.label AS register_label,s.kind ${join} ${filter} ORDER BY e.event_year DESC NULLS LAST,e.event_date DESC NULLS LAST,e.created_at DESC,e.id LIMIT $5 OFFSET $6`,
+          `SELECT e.*,e.subject_name AS person_name,s.label AS register_label,s.kind ${join} ${filter} ORDER BY e.event_year DESC NULLS LAST,e.event_date DESC NULLS LAST,e.created_at DESC,e.id LIMIT $7 OFFSET $8`,
           [...params, l, offset],
         )
       ).rows;
@@ -938,8 +980,8 @@ api.get("/entries", permit("registers.view"), async (req, res) =>
         (summary.rejected || 0);
       const years = (
         await db.query(
-          `SELECT e.event_year AS year,count(*)::int AS count ${join} ${scope} AND ($2::text IS NOT NULL) GROUP BY e.event_year ORDER BY e.event_year DESC NULLS LAST`,
-          params.slice(0, 3),
+          `SELECT e.event_year AS year,count(*)::int AS count ${join} ${scope} AND ($2::text IS NOT NULL) AND ($4::text IS NOT NULL) GROUP BY e.event_year ORDER BY e.event_year DESC NULLS LAST`,
+          params,
         )
       ).rows;
       await log(req, db, "entries.list", "entry", null, {
@@ -1252,7 +1294,11 @@ api.get("/assets", permit("archive.view"), async (req, res) =>
 );
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: (process.env.VERCEL ? 4 : 25) * 1024 * 1024, files: 1, fields: 4 },
+  limits: {
+    fileSize: (process.env.VERCEL ? 4 : 25) * 1024 * 1024,
+    files: 1,
+    fields: 4,
+  },
 });
 api.post(
   "/assets",
@@ -1453,7 +1499,8 @@ export async function enqueue(jobId: string, tenantId: string) {
   }
 }
 api.post("/jobs", permit("ocr.process"), async (req, res) => {
-  if (testDeployment()) fail(503, "OCR processing is unavailable in the test deployment.");
+  if (testDeployment())
+    fail(503, "OCR processing is unavailable in the test deployment.");
   const result = await scoped(tenant(req), async (db) => {
     const v = z
       .object({
@@ -1574,7 +1621,8 @@ api.post("/jobs/:id/import", permit("ocr.approve_import"), async (req, res) =>
   ),
 );
 api.post("/jobs/:id/retry", permit("ocr.process"), async (req, res) => {
-  if (testDeployment()) fail(503, "OCR processing is unavailable in the test deployment.");
+  if (testDeployment())
+    fail(503, "OCR processing is unavailable in the test deployment.");
   const j = await scoped(tenant(req), async (db) => {
     const j = await one(db, "ocr_jobs", req.params.id, true);
     if (j.status !== "failed" || j.provider === "manual")
@@ -2249,8 +2297,13 @@ api.get("/openapi.json", (_req, res) =>
 );
 
 api.use((_req, _res, next) => next(new HttpError(404, "API route not found.")));
-if (process.env.NODE_ENV === "development" && process.env.SERVE_CLIENT !== "true")
-  app.get("/", (req,res)=>res.redirect(307, "http://localhost:5173" + req.originalUrl));
+if (
+  process.env.NODE_ENV === "development" &&
+  process.env.SERVE_CLIENT !== "true"
+)
+  app.get("/", (req, res) =>
+    res.redirect(307, "http://localhost:5173" + req.originalUrl),
+  );
 if (
   (process.env.NODE_ENV === "production" && !process.env.VERCEL) ||
   process.env.SERVE_CLIENT === "true"
@@ -2295,17 +2348,18 @@ app.use((err: any, req: Request, res: Response, _next: NextFunction) => {
           ? "The linked record is unavailable."
           : err.code === "LIMIT_FILE_SIZE"
             ? req.path.endsWith("/photo")
-              ? `Profile photos must be ${process.env.VERCEL ? 4 : 5} MB or smaller.`
+              ? `Profile photos must be ${process.env.VERCEL || req.path.includes("/identity/") || req.path.endsWith("/auth/photo") ? 4 : 5} MB or smaller.`
               : `Files must be ${process.env.VERCEL ? 4 : 25} MB or smaller.`
             : err.message;
-  console.error(
-    JSON.stringify({
-      level: "error",
-      requestId: req.requestId,
-      status,
-      code: err.code || err.name,
-    }),
-  );
+  if (!(status === 401 && req.path.endsWith("/auth/me")))
+    (status >= 500 ? console.error : console.warn)(
+      JSON.stringify({
+        level: status >= 500 ? "error" : "warn",
+        requestId: req.requestId,
+        status,
+        code: err.code || err.name,
+      }),
+    );
   res.status(status).json({ error: message, requestId: req.requestId });
 });
 export async function seedSchemas(db: DB, tenantId: string) {

@@ -15,6 +15,8 @@ const household = z.object({
   unit_id: uuid.nullable().optional(),
   address: optional,
   contact: optional,
+  state: z.string().trim().max(200).default(""),
+  place: z.string().trim().max(200).default(""),
 });
 function fail(status: number, message: string): never {
   throw Object.assign(new Error(message), { status });
@@ -124,20 +126,26 @@ router.get("/households", async (req, res) => {
   const q = String(req.query.q || "").slice(0, 200);
   res.json(
     await scoped(req.user.tenant_id, async (db) => {
-      const params = ["%" + q + "%", unitId, status];
+      const params = [
+        "%" + q + "%",
+        unitId,
+        status,
+        String(req.query.state || "").slice(0, 200),
+        String(req.query.place || "").slice(0, 200),
+      ];
       const scope =
-        "WHERE h.name ILIKE $1 AND ($2='' OR ($2='unassigned' AND h.unit_id IS NULL) OR h.unit_id::text=$2)";
+        "WHERE h.name ILIKE $1 AND ($2='' OR ($2='unassigned' AND h.unit_id IS NULL) OR h.unit_id::text=$2) AND ($4='' OR h.state=$4) AND ($5='' OR h.place=$5)";
       const filter = scope + " AND ($3='' OR h.status=$3)";
       const items = (
         await db.query(
-          `SELECT h.*,u.name AS unit,(SELECT count(*)::int FROM persons p WHERE p.household_id=h.id) AS member_count FROM households h LEFT JOIN parish_units u ON u.id=h.unit_id ${filter} ORDER BY h.name,h.id LIMIT $4 OFFSET $5`,
+          `SELECT h.*,u.name AS unit,(SELECT count(*)::int FROM persons p WHERE p.household_id=h.id) AS member_count FROM households h LEFT JOIN parish_units u ON u.id=h.unit_id ${filter} ORDER BY h.name,h.id LIMIT $6 OFFSET $7`,
           [...params, limit, (page - 1) * limit],
         )
       ).rows;
       const counts = (
         await db.query(
-          `SELECT h.status,count(*)::int AS count FROM households h ${scope} GROUP BY h.status`,
-          params.slice(0, 2),
+          `SELECT h.status,count(*)::int AS count FROM households h ${scope} AND ($3::text IS NOT NULL) GROUP BY h.status`,
+          params,
         )
       ).rows;
       const summary = Object.fromEntries(
@@ -148,6 +156,11 @@ router.get("/households", async (req, res) => {
       await log(db, req, "households.list", "household");
       return {
         items,
+        locations: (
+          await db.query(
+            "SELECT DISTINCT state,place FROM households ORDER BY state,place",
+          )
+        ).rows,
         summary,
         total: status ? summary[status] || 0 : summary.total,
         page,
@@ -164,7 +177,7 @@ router.post("/households", async (req, res) => {
       await unit(db, v.unit_id);
       const row = (
         await db.query(
-          "INSERT INTO households(tenant_id,name,unit_id,address,contact,created_by) VALUES($1,$2,$3,$4,$5,$6) RETURNING *",
+          "INSERT INTO households(tenant_id,name,unit_id,address,contact,created_by,state,place) VALUES($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *",
           [
             req.user.tenant_id,
             v.name,
@@ -172,6 +185,8 @@ router.post("/households", async (req, res) => {
             v.address,
             v.contact,
             req.user.id,
+            v.state,
+            v.place,
           ],
         )
       ).rows[0];
@@ -198,7 +213,7 @@ router.patch("/households/:id", async (req, res) => {
         fail(409, "This household has changed. Reopen it before saving.");
       const row = (
         await db.query(
-          "UPDATE households SET name=$1,unit_id=$2,address=$3,contact=$4,status='draft',submitted_by=NULL,reviewed_by=NULL,review_note=NULL,created_by=$5,revision=revision+1 WHERE id=$6 RETURNING *",
+          "UPDATE households SET name=$1,unit_id=$2,address=$3,contact=$4,state=$7,place=$8,status='draft',submitted_by=NULL,reviewed_by=NULL,review_note=NULL,created_by=$5,revision=revision+1 WHERE id=$6 RETURNING *",
           [
             v.name,
             v.unit_id || null,
@@ -206,6 +221,8 @@ router.patch("/households/:id", async (req, res) => {
             v.contact,
             req.user.id,
             old.id,
+            v.state,
+            v.place,
           ],
         )
       ).rows[0];
@@ -279,7 +296,11 @@ router.post("/households/:id/transition", async (req, res) => {
 
 const photoUpload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: (process.env.VERCEL ? 4 : 5) * 1024 * 1024, files: 1, fields: 0 },
+  limits: {
+    fileSize: (process.env.VERCEL ? 4 : 5) * 1024 * 1024,
+    files: 1,
+    fields: 0,
+  },
 });
 router.post(
   "/persons/:id/photo",

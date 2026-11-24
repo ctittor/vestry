@@ -66,3 +66,12 @@ The earlier browser verification covered the built preview and Vercel, but misse
 A new regression starts the real Vite configuration with an isolated HTTP backend, verifies the forwarded Host and Origin for both local hostnames, and rejects unrelated origins including a spoofed forwarded-host header. Actual browser checks on each running port-5173 address passed demo administrator login, all 11 parish sidebar modules, page refresh, and logout, with no API/browser errors and no parish record changes.
 
 The complete API/security suite passed all 25 tests including the new proxy regression. The production build passed TypeScript checking and Vite compilation.
+
+
+## Scoped directories, demographic filters and identity photos - 24 November 2026
+
+Added migration 016 with structured state/place fields, private church/building/account images and a scoped building directory. Applied successfully to the local PostgreSQL database and configured Neon test database without replacing existing records. Member age counts use the full scoped result set and preserve uncertainty for non-exact birth dates. Added household location filters, register event-place/member-unit filters, direct parish member lists, and the top-right account menu. Expected unauthenticated auth/me checks no longer appear as server errors.
+
+All 26 API/security tests passed. New integration coverage verifies age boundaries, combined filters, counts beyond 100 records, household location inheritance, cross-parish isolation, central church-image permissions, invalid-image rejection, private profile images and building-image lifecycle. The normal browser suite passed 15 scenarios with the test-profile banner scenario skipped. These checks include all existing household/register/photo workflows and new directory controls; axe checks cover the new member views, church-image dialog and mobile directory. Production-policy browser results and live deployment checks are recorded below after completion.
+
+The Vercel production test build passed. All 10 production-policy browser scenarios passed, including profile image upload/removal with header refresh, central forane/parish switching, building-image upload, account-menu keyboard behavior and the explicit mobile/desktop test banner. Both real development origins (localhost:5173 and 127.0.0.1:5173) returned successful demo logins. Final TypeScript and whitespace checks passed.

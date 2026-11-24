@@ -38,3 +38,5 @@ When the API runs on Windows through `npm run dev`, share its data directory wit
 This is a working core implementation, not an independently approved production release. See [release status](docs/RELEASE_STATUS.md) for implemented workflows, known limitations and remaining release gates. No production data or public service has been created. Roman Catholic policy and certificate wording remain subject to diocesan approval.
 
 See [verification](docs/VERIFICATION.md), [deployment](docs/DEPLOYMENT.md), [backup and recovery](docs/BACKUP_AND_RECOVERY.md), [architecture](docs/ARCHITECTURE.md) and the role-specific guides in `docs/`.
+
+Member demographic filters, church/building images and the account menu are explained in [the directory guide](docs/DIRECTORY_GUIDE.md).

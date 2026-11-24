@@ -17,6 +17,7 @@ export async function officeScoped<T>(
       "SELECT set_config('app.office_role',$1,true),set_config('app.archdiocese_id',$2,true),set_config('app.forane_id',$3,true)",
       [user.role, user.archdiocese_id || "", user.forane_id || ""],
     );
+    await db.query("SELECT set_config('app.user_id',$1,true)", [user.id || ""]);
     return run(db);
   });
 }

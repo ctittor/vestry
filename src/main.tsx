@@ -1,3 +1,9 @@
+import {
+  ProfileMenu,
+  MemberDirectory,
+  ChurchDirectory,
+  IdentityPhoto,
+} from "./directory";
 import React, {
   useEffect,
   useState,
@@ -461,6 +467,7 @@ function App() {
             "Forane activities",
             "Forane dashboard",
             "Platform",
+            "Church directory",
           ].includes(page)
         ? session.user.role === "forane_admin"
           ? "Forane dashboard"
@@ -563,6 +570,15 @@ function App() {
                 Forane activities
               </button>
             )}
+            <button
+              className={
+                "nav-item " + (current === "Church directory" ? "active" : "")
+              }
+              onClick={() => navigate("Church directory")}
+            >
+              <Church size={19} />
+              Church directory
+            </button>
             {(!platform || session.tenant) &&
               navGroups.map((g) => (
                 <div className="nav-group" key={g.title}>
@@ -653,7 +669,13 @@ function App() {
               >
                 <Bell size={20} />
               </button>
-              <span className="top-avatar">{session.user.name[0]}</span>
+              <ProfileMenu
+                session={session}
+                navigate={navigate}
+                refresh={refresh}
+                notify={setToast}
+                can={can}
+              />
             </div>
           </header>
           {session.mfa_required && (
@@ -700,6 +722,14 @@ function App() {
               <Administration />
             ) : current === "Audit history" ? (
               <Audit />
+            ) : current === "Church directory" ? (
+              <ChurchDirectory
+                onMembers={(id) => {
+                  setParish(id);
+                  refresh();
+                  navigate("Members");
+                }}
+              />
             ) : current === "My account" ? (
               <Account />
             ) : current === "Platform" ? (
@@ -1172,14 +1202,17 @@ function Registers({
   onEntry: (id: string) => void;
 }) {
   const [q, setQ] = useState(""),
+    [eventPlace, setEventPlace] = useState(""),
+    [entryUnit, setEntryUnit] = useState(""),
     [kind, setKind] = useState(""),
     [year, setYear] = useState(""),
     [status, setStatus] = useState(approval ? "submitted" : ""),
     [page, setPage] = useState(1),
     [create, setCreate] = useState(false);
   const { can } = useApp();
+  const { data: registerUnits } = useData("/units");
   const { data, error, loading, reload } = useData(
-    `/entries?q=${encodeURIComponent(q)}&kind=${kind}&year=${year}&status=${status}&page=${page}`,
+    `/entries?q=${encodeURIComponent(q)}&kind=${kind}&year=${year}&status=${status}&place=${encodeURIComponent(eventPlace)}&unit=${entryUnit}&page=${page}`,
   );
   return (
     <>
@@ -1241,6 +1274,30 @@ function Registers({
               }}
             />
           </div>
+          <input
+            aria-label="Register event place"
+            placeholder="Filter event place"
+            value={eventPlace}
+            onChange={(e) => {
+              setEventPlace(e.target.value);
+              setPage(1);
+            }}
+          />
+          <select
+            aria-label="Register member unit"
+            value={entryUnit}
+            onChange={(e) => {
+              setEntryUnit(e.target.value);
+              setPage(1);
+            }}
+          >
+            <option value="">All member units</option>
+            {registerUnits?.items.map((u: Row) => (
+              <option key={u.id} value={u.id}>
+                {u.name}
+              </option>
+            ))}
+          </select>
           <select
             aria-label="Register year"
             value={year}
@@ -1924,118 +1981,20 @@ function EntryDetail({ id, onClose }: { id: string; onClose: () => void }) {
   );
 }
 function People() {
-  const [q, setQ] = useState(""),
-    [page, setPage] = useState(1),
-    [editing, setEditing] = useState<Row | null>(null),
-    [create, setCreate] = useState(false);
-  const { data, error, loading, reload } = useData(
-      `/persons?q=${encodeURIComponent(q)}&page=${page}`,
-    ),
-    { can } = useApp();
+  const [editing, setEditing] = useState<Row | null>(null),
+    [create, setCreate] = useState(false),
+    [revision, reload] = useState(0);
+  const { session, refresh, can } = useApp();
   return (
     <>
-      <SectionHeading
-        eyebrow="PEOPLE & CONNECTIONS"
-        title="A community, by name."
-        description="Thoughtful records for the people at the heart of your parish."
-        action={
-          can("members.create") && (
-            <Button className="primary" onClick={() => setCreate(true)}>
-              <Plus size={17} />
-              Add member
-            </Button>
-          )
-        }
+      <MemberDirectory
+        session={session}
+        refresh={refresh}
+        onEdit={setEditing}
+        onAdd={() => setCreate(true)}
+        revision={revision}
+        canAdd={can("members.create")}
       />
-      <section className="panel">
-        <div className="list-toolbar">
-          <div className="input-icon">
-            <Search size={17} />
-            <input
-              aria-label="Search members"
-              placeholder="Search names, alternate spellings, or membership numbers…"
-              value={q}
-              onChange={(e) => {
-                setQ(e.target.value);
-                setPage(1);
-              }}
-            />
-          </div>
-          <span className="muted">{fmt(data?.total)} members</span>
-        </div>
-        <ErrorBox error={error} />
-        {loading ? (
-          <Loading />
-        ) : data?.items.length ? (
-          <div className="table-scroll">
-            <table>
-              <thead>
-                <tr>
-                  <th>MEMBER</th>
-                  <th>MEMBERSHIP NO.</th>
-                  <th>HOUSEHOLD</th>
-                  <th>STATUS</th>
-                  <th>PROFILE</th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.items.map((p: Row, i: number) => (
-                  <tr key={p.id}>
-                    <td>
-                      <div className="person-cell">
-                        <span className={"initials tone-" + (i % 4)}>
-                          {p.photo_version ? (
-                            <img
-                              className="member-photo"
-                              src={`/api/v1/persons/${p.id}/photo?v=${p.photo_version}${parishQuery()}`}
-                              alt=""
-                              loading="lazy"
-                              width="40"
-                              height="40"
-                            />
-                          ) : (
-                            p.name
-                              .split(" ")
-                              .map((s: string) => s[0])
-                              .slice(0, 2)
-                              .join("")
-                          )}
-                        </span>
-                        <span>
-                          <strong>{p.name}</strong>
-                          <small>
-                            {p.local_name || p.email || "Parish member"}
-                          </small>
-                        </span>
-                      </div>
-                    </td>
-                    <td>{p.membership_no}</td>
-                    <td>{p.household_name || "Unassigned"}</td>
-                    <td>
-                      <Badge status={p.status} />
-                    </td>
-                    <td>
-                      <button
-                        className="text-button"
-                        onClick={() => setEditing(p)}
-                      >
-                        View profile <ChevronRight size={15} />
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        ) : (
-          <Empty
-            title="Make your first connection"
-            description="Add a member or adjust your search."
-            icon={Users}
-          />
-        )}
-        <Pagination data={data} page={page} setPage={setPage} />
-      </section>
       {(create || editing) && (
         <PersonForm
           initial={editing || undefined}
@@ -2046,7 +2005,7 @@ function People() {
           onSaved={() => {
             setCreate(false);
             setEditing(null);
-            reload();
+            reload((n) => n + 1);
           }}
         />
       )}
@@ -2146,6 +2105,8 @@ function PersonForm({
                 ["alternate_names", "Alternate / transliterated names"],
                 ["email", "Email"],
                 ["phone", "Phone"],
+                ["state", "State"],
+                ["place", "Place / locality"],
                 ["birth_date", "Birth date / year"],
               ].map(([k, l]) => (
                 <Field key={k} label={l}>
@@ -2403,6 +2364,7 @@ function MemberPhotoPicker({
   );
 }
 function HouseholdWorkspace() {
+  const [location, setLocation] = useState({ state: "", place: "" });
   const [q, setQ] = useState(""),
     [unit, setUnit] = useState(""),
     [status, setStatus] = useState(""),
@@ -2412,7 +2374,7 @@ function HouseholdWorkspace() {
     [manage, setManage] = useState(false);
   const { can } = useApp();
   const { data, error, loading, reload } = useData(
-    `/households?q=${encodeURIComponent(q)}&unit=${unit}&status=${status}&page=${page}`,
+    `/households?q=${encodeURIComponent(q)}&unit=${unit}&status=${status}&state=${encodeURIComponent(location.state)}&place=${encodeURIComponent(location.place)}&page=${page}`,
   );
   const {
     data: units,
@@ -2491,6 +2453,46 @@ function HouseholdWorkspace() {
               </option>
             ))}
           </select>
+        </div>
+        <div className="directory-filters">
+          {["state", "place"].map((k) => (
+            <label key={k}>
+              {k === "state" ? "State" : "Place"}
+              <select
+                aria-label={"Household " + k}
+                value={location[k as "state" | "place"]}
+                onChange={(e) => {
+                  setLocation({
+                    ...location,
+                    [k]: e.target.value,
+                    ...(k === "state" ? { place: "" } : {}),
+                  });
+                  setPage(1);
+                }}
+              >
+                <option value="">
+                  All {k === "state" ? "states" : "places"}
+                </option>
+                {Array.from(
+                  new Set(
+                    (data?.locations || [])
+                      .filter(
+                        (r: Row) =>
+                          k !== "place" ||
+                          !location.state ||
+                          r.state === location.state,
+                      )
+                      .map((r: Row) => r[k])
+                      .filter(Boolean),
+                  ),
+                ).map((v) => (
+                  <option key={String(v)} value={String(v)}>
+                    {String(v)}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ))}
         </div>
         <ErrorBox error={error || unitError} />
         {loading ? (
@@ -2769,10 +2771,18 @@ function HouseholdEditor({
                 ))}
               </select>
             </Field>
-            {["address", "contact"].map((k) => (
+            {["address", "contact", "state", "place"].map((k) => (
               <Field
                 key={k}
-                label={k === "address" ? "Address" : "Primary contact"}
+                label={
+                  k === "address"
+                    ? "Address"
+                    : k === "contact"
+                      ? "Primary contact"
+                      : k === "state"
+                        ? "State"
+                        : "Place / locality"
+                }
               >
                 <input
                   maxLength={2000}
@@ -4860,6 +4870,15 @@ function Account() {
       <ErrorBox error={error} />
       <div className="report-grid">
         <section className="panel settings-panel">
+          <IdentityPhoto
+            kind="user"
+            id={session.user.id}
+            name={session.user.name}
+            version={session.profile_photo_version}
+            editable
+            onSaved={refresh}
+            compact
+          />
           <h2>{session.user.name}</h2>
           <p>{session.user.email}</p>
           <div className="notice">
@@ -7708,8 +7727,9 @@ createRoot(document.getElementById("root")!).render(
       <div className="test-deployment-banner" role="status">
         <strong>Test deployment · Synthetic data only</strong>
         <span>
-          Uploads, original files, OCR and outgoing email are unavailable.
-          In-app change alerts remain active.
+          Original register files, OCR and outgoing email are unavailable.
+          Church, building and account photos are available. In-app change
+          alerts remain active.
         </span>
       </div>
     )}
